@@ -29,7 +29,7 @@ jobs:
       - run:
           name: Run unit tests
           command: |
-            make ciTest | go-junit-report > /tmp/test-results/report.xml/report.xml
+            make ciTest | go-junit-report > /tmp/test-results/report.xml
 
       - save_cache:
           key: pkg-cache-{{ checksum "vendor/vendor.json" }}
