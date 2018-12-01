@@ -15,6 +15,18 @@
 			"revisionTime": "2018-09-20T04:04:54Z"
 		},
 		{
+			"checksumSHA1": "5LK/JjBog0PqfJb9GUvuAXfqvYU=",
+			"path": "github.com/mattn/go-runewidth",
+			"revision": "c88d7e5f2e24de48a200a2655ac8a0910be9a0f7",
+			"revisionTime": "2018-11-17T16:33:26Z"
+		},
+		{
+			"checksumSHA1": "iAaX0GtKtIRjvqvIhogId+2Vfo8=",
+			"path": "github.com/olekukonko/tablewriter",
+			"revision": "e6d60cf7ba1f42d86d54cdf5508611c4aafb3970",
+			"revisionTime": "2018-10-26T07:14:10Z"
+		},
+		{
 			"checksumSHA1": "QxBGuFiDP7AZx9/QOwJVVDlHjLM=",
 			"path": "github.com/sergi/go-diff/diffmatchpatch",
 			"revision": "da645544ed44df016359bd4c0e3dc60ee3a0da43",
@@ -39,5 +51,5 @@
 			"revisionTime": "2018-03-28T19:50:20Z"
 		}
 	],
-	"rootPath": "github.com/idagio/go-apidiff"
+	"rootPath": "github.com/tgrk/apidiff"
 }

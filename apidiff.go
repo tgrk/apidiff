@@ -11,6 +11,7 @@ import (
 	"path"
 	"time"
 
+	// "github.com/dnaeon/go-vcr/cassette"
 	"github.com/dnaeon/go-vcr/recorder"
 )
 
@@ -28,6 +29,7 @@ type Options struct {
 // RecordedSession represents stored API session
 type RecordedSession struct {
 	Name    string
+	Path    string
 	Created time.Time
 }
 
@@ -70,9 +72,9 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 
 	for _, file := range files {
 		if file.IsDir() {
-			// path := path.Join(ad.DirectoryPath, file.Name())
 			session := RecordedSession{
 				Name:    file.Name(),
+				Path:    path.Join(ad.DirectoryPath, file.Name()),
 				Created: file.ModTime(),
 			}
 			sessions = append(sessions, session)
@@ -83,11 +85,11 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 
 // Record stores requested URL using casettes into a defined
 // directory
-func (ad *APIDiff) Record(url string) error {
-	path := path.Join(ad.DirectoryPath, ad.getURLHash(url))
+func (ad *APIDiff) Record(name, url string) error {
+	path := path.Join(ad.DirectoryPath, name, ad.getURLHash(url))
 
 	if ad.Options.Verbose {
-		fmt.Printf("Recording %q to %q...\n", url, path)
+		fmt.Printf("Recording %q to \"%s.yaml\"...\n", url, path)
 	}
 
 	r, err := recorder.New(path)
@@ -105,15 +107,29 @@ func (ad *APIDiff) Record(url string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	fmt.Printf("RECORD: resp=%+v\n", resp)
+	//TODO: write metrics about request
 
-	return nil
+	return resp.Body.Close()
 }
 
 // Compare compare two stored sessions
 func (ad *APIDiff) Compare() error {
+	// r, err := recorder.New("fixtures/matchers")
+	// if err != nil {
+	// 	return err
+	// }
+	// defer r.Stop()
+
+	// r.SetMatcher(func(r *http.Request, i cassette.Request) bool {
+	// 	var b bytes.Buffer
+	// 	if _, err := b.ReadFrom(r.Body); err != nil {
+	// 		return false
+	// 	}
+	// 	r.Body = ioutil.NopCloser(&b)
+	// 	return cassette.DefaultMatcher(r, i) && (b.String() == "" || b.String() == i.Body)
+	// })
+
 	return nil
 }
 

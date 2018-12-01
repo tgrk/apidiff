@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/tgrk/apidiff"
 )
 
@@ -71,10 +72,23 @@ func main() {
 		}
 		if len(sessions) == 0 {
 			fmt.Println("No recorded sessions found")
-		}
+		} else {
+			rows := [][]string{}
+			for _, session := range sessions {
+				rows = append(rows, []string{
+					session.Name,
+					session.Path,
+					session.Created.Format("2006-01-02 15:04:05"),
+				})
+			}
 
-		for _, session := range sessions {
-			fmt.Println(session.String())
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+			table.SetCenterSeparator("|")
+			table.SetHeader([]string{"Name", "Path", "Created"})
+			table.SetAutoMergeCells(true)
+			table.AppendBulk(rows)
+			table.Render()
 		}
 	}
 
