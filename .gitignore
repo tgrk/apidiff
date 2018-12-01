@@ -1,3 +1,4 @@
 vendor/github.com
 vendor/gopkg.in
 fmt
+apidiff
