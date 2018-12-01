@@ -16,7 +16,7 @@ jobs:
 
       - restore_cache:
           keys:
-            - {{ checksum "vendor/vendor.json" }}-pkg-cache
+            - pkg-cache-{{ checksum "vendor/vendor.json" }}
 
       - run:
           name: Fetch dependencies
@@ -32,7 +32,7 @@ jobs:
             make ciTest | go-junit-report > /tmp/test-results/report.xml/report.xml
 
       - save_cache:
-          key: {{ checksum "vendor/vendor.json" }}-pkg-cache
+          key: pkg-cache-{{ checksum "vendor/vendor.json" }}
           paths:
             - "/go/pkg"
 
