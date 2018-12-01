@@ -31,6 +31,11 @@ jobs:
           command: |
             make ciTest | go-junit-report > /tmp/test-results/report.xml
 
+      - run:
+          name: Upload coverage report to Codecov
+          command: |
+            bash <(curl -s https://codecov.io/bash)
+
       - save_cache:
           key: pkg-cache-{{ checksum "vendor/vendor.json" }}
           paths:
