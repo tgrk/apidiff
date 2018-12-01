@@ -1,0 +1,43 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "jbMuOwNfeGgHQPHX6NECj+1O/Kc=",
+			"path": "github.com/dnaeon/go-vcr/cassette",
+			"revision": "5637cf3d8a31b20882d79bd0e53a186d3821b155",
+			"revisionTime": "2018-09-20T04:04:54Z"
+		},
+		{
+			"checksumSHA1": "NbU9JGgKmtEYRUd2K0Fq7fjxmOA=",
+			"path": "github.com/dnaeon/go-vcr/recorder",
+			"revision": "5637cf3d8a31b20882d79bd0e53a186d3821b155",
+			"revisionTime": "2018-09-20T04:04:54Z"
+		},
+		{
+			"checksumSHA1": "QxBGuFiDP7AZx9/QOwJVVDlHjLM=",
+			"path": "github.com/sergi/go-diff/diffmatchpatch",
+			"revision": "da645544ed44df016359bd4c0e3dc60ee3a0da43",
+			"revisionTime": "2018-02-05T16:33:09Z"
+		},
+		{
+			"checksumSHA1": "jxa5QGd5XWyonlS+O/C9Fadmafc=",
+			"path": "github.com/yudai/gojsondiff",
+			"revision": "0525c875b75ca60b9e67ddc44496aa16f21066b0",
+			"revisionTime": "2018-05-04T02:02:46Z"
+		},
+		{
+			"checksumSHA1": "5xoBoioS8LWHn9FC0pL+vo7wDjs=",
+			"path": "github.com/yudai/golcs",
+			"revision": "ecda9a501e8220fae3b4b600c3db4b0ba22cfc68",
+			"revisionTime": "2017-03-16T03:48:04Z"
+		},
+		{
+			"checksumSHA1": "ZSWoOPUNRr5+3dhkLK3C4cZAQPk=",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "5420a8b6744d3b0345ab293f6fcba19c978f1183",
+			"revisionTime": "2018-03-28T19:50:20Z"
+		}
+	],
+	"rootPath": "github.com/idagio/go-apidiff"
+}

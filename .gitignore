@@ -1,1 +1,2 @@
-vendor/
+vendor/github.com
+vendor/gopkg.in
