@@ -16,6 +16,7 @@ default:
 .PHONY: devDeps
 devDeps:
 	go get -u github.com/alecthomas/gometalinter
+	go get -u golang.org/x/tools/cmd/cover
 	go get -u github.com/kardianos/govendor
 	go get -u github.com/joho/godotenv/cmd/godotenv
 
@@ -38,7 +39,7 @@ lint:
 
 .PHONY: cover
 cover:
-	bin/go-cover
+	go test -coverprofile fmt
 
 .PHONY: format
 format:
