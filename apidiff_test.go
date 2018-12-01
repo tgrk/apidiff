@@ -62,7 +62,7 @@ func TestRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer removeTempStorageDirectory(path)
+	//defer removeTempStorageDirectory(path)
 
 	ad := New(path, Options{Verbose: true})
 
@@ -71,11 +71,17 @@ func TestRecord(t *testing.T) {
 		t.Error("Missing URLs for recording")
 	}
 
-	err = ad.Record(urls[0])
+	err = ad.Record("foo", urls[0])
 	if err != nil {
 		t.Error(err)
 	}
 
+	sessions, err := ad.List()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Printf("DEBUG: sessions=%+v\n", sessions)
 }
 
 func TestIsValidURL(t *testing.T) {
