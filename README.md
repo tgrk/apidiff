@@ -1,4 +1,8 @@
 
+[![CircleCI](https://circleci.com/gh/tgrk/apidiff/tree/master.svg?style=svg)](https://circleci.com/gh/tgrk/apidiff/tree/master)
+[![codecov.io](https://codecov.io/github/tgrk/apidiff/coverage.svg?branch=master)](https://codecov.io/github/tgrk/apidiff?branch=master)
+
+
 # API Diff
 Records API calls and compares the
 
