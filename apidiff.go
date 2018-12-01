@@ -85,6 +85,11 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 // directory
 func (ad *APIDiff) Record(url string) error {
 	path := path.Join(ad.DirectoryPath, ad.getURLHash(url))
+
+	if ad.Options.Verbose {
+		fmt.Printf("Recording %q to %q...\n", url, path)
+	}
+
 	r, err := recorder.New(path)
 	if err != nil {
 		return err
@@ -100,8 +105,9 @@ func (ad *APIDiff) Record(url string) error {
 	if err != nil {
 		return err
 	}
-	// resp.StatusCode
 	defer resp.Body.Close()
+
+	fmt.Printf("RECORD: resp=%+v\n", resp)
 
 	return nil
 }
@@ -113,7 +119,7 @@ func (ad *APIDiff) Compare() error {
 
 func (ad *APIDiff) isValidURL(strURL string) bool {
 	uri, err := url.Parse(strURL)
-	if err != nil && uri.Scheme != "http" && uri.Scheme != "https" {
+	if err != nil || (uri.Scheme != "http" && uri.Scheme != "https") {
 		return false
 	}
 	return true

@@ -31,6 +31,8 @@ func TestReadingURLsFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer removeTempStorageDirectory(path)
+
 	ad := New(path, Options{})
 
 	urls := getURLs()
@@ -52,6 +54,46 @@ func TestReadingURLsFromFile(t *testing.T) {
 
 	if !reflect.DeepEqual(urls, result) {
 		t.Error("Expected to read the same urls from file")
+	}
+}
+
+func TestRecord(t *testing.T) {
+	path, err := makeTempStorageDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeTempStorageDirectory(path)
+
+	ad := New(path, Options{Verbose: true})
+
+	urls := getURLs()
+	if len(urls) == 0 {
+		t.Error("Missing URLs for recording")
+	}
+
+	err = ad.Record(urls[0])
+	if err != nil {
+		t.Error(err)
+	}
+
+}
+
+func TestIsValidURL(t *testing.T) {
+	urls := getURLs()
+	if len(urls) == 0 {
+		t.Error("Missing URLs for recording")
+	}
+	urls = append(urls, "ftp://invalid")
+
+	expected := []bool{
+		true, true, false,
+	}
+
+	ad := New("", Options{})
+	for i, url := range urls {
+		if expected[i] != ad.isValidURL(url) {
+			t.Errorf("Expected %q to be invalid", url)
+		}
 	}
 }
 
