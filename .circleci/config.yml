@@ -24,7 +24,7 @@ jobs:
 
       - run:
           name: Run linter
-          command: go lint && go vet
+          command: make lint
 
       - run:
           name: Run unit tests

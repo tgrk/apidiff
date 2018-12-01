@@ -15,6 +15,7 @@ default:
 
 .PHONY: devDeps
 devDeps:
+	go get -u github.com/alecthomas/gometalinter
 	go get -u github.com/kardianos/govendor
 	go get -u github.com/joho/godotenv/cmd/godotenv
 
@@ -61,6 +62,8 @@ run:
 
 .PHONY: ciDeps
 ciDeps: deps
+	go get -u github.com/alecthomas/gometalinter
+	gometalinter --install
 	go get github.com/jstemmer/go-junit-report
 
 .PHONY: ciTest
