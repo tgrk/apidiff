@@ -47,7 +47,11 @@ func TestReadingURLsFromFile(t *testing.T) {
 	}
 	defer reader.Close()
 
-	result, err := ad.ReadURLs(reader)
+	s := RecordedSession{
+		Name: "foo",
+	}
+
+	result, err := ad.ReadURLs(s, reader)
 	if err != nil {
 		t.Error(err)
 	}
@@ -71,7 +75,11 @@ func TestRecord(t *testing.T) {
 		t.Error("Missing URLs for recording")
 	}
 
-	err = ad.Record("foo", urls[0])
+	s := RecordedSession{
+		Name: "foo",
+	}
+	ri := NewRequest(s, urls[0])
+	err = ad.Record(ru)
 	if err != nil {
 		t.Error(err)
 	}

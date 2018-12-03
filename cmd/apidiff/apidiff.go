@@ -111,12 +111,13 @@ func main() {
 				os.Exit(1)
 			}
 
-			urls, err := ad.ReadURLs(reader)
+			s := apidiff.RecordedSession{}
+			urls, err := ad.ReadURLs(s, reader)
 			if err != nil {
 				printErrorf("Unable to read input URLs due to %s", err)
 				os.Exit(1)
 			}
-			fmt.Printf("DEBUG: urls=%v\n", urls)
+			fmt.Printf("DEBUG: urls=%+v\n", urls)
 		}
 	}
 }

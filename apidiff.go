@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	// "net/http/httptrace"
 	"net/url"
 	"path"
 	"time"
@@ -47,19 +48,19 @@ func New(path string, options Options) *APIDiff {
 
 // ReadURLs reads URL per line from supplied reader and return
 // slice of validated URL or an error
-func (ad *APIDiff) ReadURLs(r io.Reader) ([]string, error) {
-	urls := []string{}
+func (ad *APIDiff) ReadURLs(s RecordedSession, r io.Reader) ([]RequestInfo, error) {
+	ri := []RequestInfo{}
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		urls = append(urls, scanner.Text())
+		ri = append(ri, NewRequest(s, scanner.Text()))
 	}
 
 	if err := scanner.Err(); err != nil {
-		return urls, err
+		return ri, err
 	}
 
-	return urls, nil
+	return ri, nil
 }
 
 // List existing stored API recording sessions
@@ -85,11 +86,11 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 
 // Record stores requested URL using casettes into a defined
 // directory
-func (ad *APIDiff) Record(name, url string) error {
-	path := path.Join(ad.DirectoryPath, name, ad.getURLHash(url))
+func (ad *APIDiff) Record(input RequestInfo) error {
+	path := path.Join(ad.DirectoryPath, input.Session.Name, ad.getURLHash(input.URL))
 
 	if ad.Options.Verbose {
-		fmt.Printf("Recording %q to \"%s.yaml\"...\n", url, path)
+		fmt.Printf("Recording %q to \"%s.yaml\"...\n", input.URL, path)
 	}
 
 	r, err := recorder.New(path)
@@ -98,17 +99,37 @@ func (ad *APIDiff) Record(name, url string) error {
 	}
 	defer r.Stop()
 
+	//TODO: write metrics about request
+
+	// trace := &httptrace.ClientTrace
+	// 	GotConn: func(connInfo httptrace.GotConnInfo) {
+	// 		fmt.Printf("Got Conn: %+v\n", connInfo)
+	// 	},
+	// 	DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
+	// 		fmt.Printf("DNS Info: %+v\n", dnsInfo)
+	// 	},
+	// }
+
+	req, err := http.NewRequest(input.Verb, input.URL, input.Payload)
+	if err != nil {
+		return err
+	}
+
+	for headerKey, headerValue := range input.Headers {
+		req.Header.Set(headerKey, headerValue)
+	}
+
+	// req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+
 	// Create an HTTP client and inject our recorder
 	client := &http.Client{
 		Transport: r,
 	}
 
-	resp, err := client.Get(url)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-
-	//TODO: write metrics about request
 
 	return resp.Body.Close()
 }
