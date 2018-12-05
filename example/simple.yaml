@@ -1,0 +1,8 @@
+version: 1
+requests:
+  - name: "Retrieve a random chuck joke in JSON format."
+    url: "https://api.chucknorris.io/jokes/random"
+    method: "get"
+    headers:
+      Content-Type:
+        - application/json; charset=utf-8
