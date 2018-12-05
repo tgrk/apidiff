@@ -1,19 +1,18 @@
 package apidiff
 
 import (
-	"bufio"
 	"fmt"
 	"hash/fnv"
-	"io"
 	"io/ioutil"
 	"net/http"
-	// "net/http/httptrace"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
-	// "github.com/dnaeon/go-vcr/cassette"
 	"github.com/dnaeon/go-vcr/recorder"
+	"github.com/tcnksm/go-httpstat"
+	"gopkg.in/yaml.v2"
 )
 
 // APIDiff instance
@@ -25,6 +24,7 @@ type APIDiff struct {
 // Options holds shared CLI arguments from user
 type Options struct {
 	Verbose bool
+	Name    string
 }
 
 // RecordedSession represents stored API session
@@ -32,6 +32,15 @@ type RecordedSession struct {
 	Name    string
 	Path    string
 	Created time.Time
+}
+
+// RequestStats hold HTTP stats metrics
+type RequestStats struct {
+	DNSLookup        int `yaml:"dns_lookup"`
+	TCPConnection    int `yaml:"tcp_connection"`
+	TLSHandshake     int `yaml:"tls_andshake"`
+	ServerProcessing int `yaml:"server_rocessing"`
+	ContentTransfer  int `yaml:"content_transfer"`
 }
 
 func (rs RecordedSession) String() string {
@@ -44,23 +53,6 @@ func New(path string, options Options) *APIDiff {
 		DirectoryPath: path,
 		Options:       options,
 	}
-}
-
-// ReadURLs reads URL per line from supplied reader and return
-// slice of validated URL or an error
-func (ad *APIDiff) ReadURLs(s RecordedSession, r io.Reader) ([]RequestInfo, error) {
-	ri := []RequestInfo{}
-
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		ri = append(ri, NewRequest(s, scanner.Text()))
-	}
-
-	if err := scanner.Err(); err != nil {
-		return ri, err
-	}
-
-	return ri, nil
 }
 
 // List existing stored API recording sessions
@@ -86,11 +78,11 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 
 // Record stores requested URL using casettes into a defined
 // directory
-func (ad *APIDiff) Record(input RequestInfo) error {
-	path := path.Join(ad.DirectoryPath, input.Session.Name, ad.getURLHash(input.URL))
+func (ad *APIDiff) Record(name string, ri RequestInfo) error {
+	path := path.Join(ad.DirectoryPath, name, ad.getURLHash(ri.URL))
 
 	if ad.Options.Verbose {
-		fmt.Printf("Recording %q to \"%s.yaml\"...\n", input.URL, path)
+		fmt.Printf("Recording %q to \"%s.yaml\"...\n", ri.URL, path)
 	}
 
 	r, err := recorder.New(path)
@@ -99,27 +91,22 @@ func (ad *APIDiff) Record(input RequestInfo) error {
 	}
 	defer r.Stop()
 
-	//TODO: write metrics about request
-
-	// trace := &httptrace.ClientTrace
-	// 	GotConn: func(connInfo httptrace.GotConnInfo) {
-	// 		fmt.Printf("Got Conn: %+v\n", connInfo)
-	// 	},
-	// 	DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
-	// 		fmt.Printf("DNS Info: %+v\n", dnsInfo)
-	// 	},
-	// }
-
-	req, err := http.NewRequest(input.Verb, input.URL, input.Payload)
+	// ri.Payload
+	req, err := http.NewRequest(strings.ToUpper(ri.Method), ri.URL, nil)
 	if err != nil {
 		return err
 	}
 
-	for headerKey, headerValue := range input.Headers {
-		req.Header.Set(headerKey, headerValue)
+	for headerKey, headerValue := range ri.Headers {
+		for _, childHeaderValue := range headerValue {
+			req.Header.Set(headerKey, childHeaderValue)
+		}
 	}
 
-	// req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	// collect metrics
+	var stats httpstat.Result
+	ctx := httpstat.WithHTTPStat(req.Context(), &stats)
+	req = req.WithContext(ctx)
 
 	// Create an HTTP client and inject our recorder
 	client := &http.Client{
@@ -129,6 +116,11 @@ func (ad *APIDiff) Record(input RequestInfo) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
+	}
+
+	err = ad.writeRequestStats(name, ri.URL, stats)
+	if err != nil {
+		return fmt.Errorf("Unable to write request stats due to %s", err)
 	}
 
 	return resp.Body.Close()
@@ -150,6 +142,31 @@ func (ad *APIDiff) Compare() error {
 	// 	r.Body = ioutil.NopCloser(&b)
 	// 	return cassette.DefaultMatcher(r, i) && (b.String() == "" || b.String() == i.Body)
 	// })
+
+	return nil
+}
+
+func (ad *APIDiff) writeRequestStats(name, url string, result httpstat.Result) error {
+	filename := fmt.Sprintf("%s_stats.yaml", ad.getURLHash(url))
+	path := path.Join(ad.DirectoryPath, name, filename)
+
+	stats := RequestStats{
+		DNSLookup:        int(result.DNSLookup / time.Millisecond),
+		TCPConnection:    int(result.TCPConnection / time.Millisecond),
+		TLSHandshake:     int(result.TLSHandshake / time.Millisecond),
+		ServerProcessing: int(result.ServerProcessing / time.Millisecond),
+		ContentTransfer:  int(result.ContentTransfer(time.Now()) / time.Millisecond),
+	}
+
+	output, err := yaml.Marshal(&stats)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(path, output, 0644)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

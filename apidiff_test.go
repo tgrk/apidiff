@@ -1,10 +1,10 @@
 package apidiff
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"reflect"
 	"testing"
 )
@@ -26,38 +26,24 @@ func TestListCommand(t *testing.T) {
 	}
 }
 
-func TestReadingURLsFromFile(t *testing.T) {
-	path, err := makeTempStorageDirectory()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer removeTempStorageDirectory(path)
+func TestManifestParsing(t *testing.T) {
+	manifest := readExampleManifest(t)
 
-	ad := New(path, Options{})
-
-	urls := getURLs()
-	sourceFilePath, err := createFileWithURLs(urls)
-	if err != nil {
-		t.Error(err)
-	}
-
-	reader, err := os.Open(sourceFilePath)
-	if err != nil {
-		t.Error(err)
-	}
-	defer reader.Close()
-
-	s := RecordedSession{
-		Name: "foo",
+	expected := Manifest{
+		Version: 1,
+		Requests: []RequestInfo{
+			RequestInfo{
+				URL:    "https://api.chucknorris.io/jokes/random",
+				Method: "get",
+				Headers: map[string][]string{
+					"Content-Type": []string{"application/json; charset=utf-8"},
+				},
+			},
+		},
 	}
 
-	result, err := ad.ReadURLs(s, reader)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if !reflect.DeepEqual(urls, result) {
-		t.Error("Expected to read the same urls from file")
+	if reflect.DeepEqual(expected, manifest) {
+		t.Errorf("Expect manifest to be equal to %+v got %+v", expected, manifest)
 	}
 }
 
@@ -69,20 +55,18 @@ func TestRecord(t *testing.T) {
 	//defer removeTempStorageDirectory(path)
 
 	ad := New(path, Options{Verbose: true})
+	manifest := readExampleManifest(t)
 
-	urls := getURLs()
-	if len(urls) == 0 {
-		t.Error("Missing URLs for recording")
-	}
+	fmt.Printf("DEBUG: manifest=%+v\n", manifest)
 
-	s := RecordedSession{
-		Name: "foo",
-	}
-	ri := NewRequest(s, urls[0])
-	err = ad.Record(ru)
-	if err != nil {
-		t.Error(err)
-	}
+	// sessionName := "foo"
+
+	// for _, request := range manifest.Requests {
+	// 	err = ad.Record(sessionName, request)
+	// 	if err != nil {
+	// 		t.Error(err)
+	// 	}
+	// }
 
 	sessions, err := ad.List()
 	if err != nil {
@@ -93,11 +77,11 @@ func TestRecord(t *testing.T) {
 }
 
 func TestIsValidURL(t *testing.T) {
-	urls := getURLs()
-	if len(urls) == 0 {
-		t.Error("Missing URLs for recording")
+	urls := []string{
+		"http://www.example.com",
+		"https://api.example.com/foo",
+		"ftp://somewhere",
 	}
-	urls = append(urls, "ftp://invalid")
 
 	expected := []bool{
 		true, true, false,
@@ -111,28 +95,21 @@ func TestIsValidURL(t *testing.T) {
 	}
 }
 
-func createFileWithURLs(urls []string) (string, error) {
-	file, err := ioutil.TempFile("/tmp", "testapi")
+func readExampleManifest(t *testing.T) *Manifest {
+	path := path.Join("example", "simple.yaml")
+
+	reader, err := os.Open(path)
 	if err != nil {
-		return "", err
+		t.Error(err)
+	}
+	defer reader.Close()
+
+	manifest := NewManifest()
+	if err := manifest.Parse(reader); err != nil {
+		t.Error(err)
 	}
 
-	writer := bufio.NewWriter(file)
-	defer file.Close()
-
-	for _, url := range urls {
-		fmt.Fprintln(writer, url)
-	}
-	writer.Flush()
-
-	return file.Name(), nil
-}
-
-func getURLs() []string {
-	return []string{
-		"https://api.chucknorris.io/jokes/random",
-		"https://jsonplaceholder.typicode.com/posts",
-	}
+	return manifest
 }
 
 func makeTempStorageDirectory() (string, error) {

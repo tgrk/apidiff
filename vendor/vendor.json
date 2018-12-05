@@ -33,6 +33,12 @@
 			"revisionTime": "2018-02-05T16:33:09Z"
 		},
 		{
+			"checksumSHA1": "fit1CKOwCh9/ECxZWSq7xE2dCGo=",
+			"path": "github.com/tcnksm/go-httpstat",
+			"revision": "6962beb23919c3de82c788a87b36f4f901ab514d",
+			"revisionTime": "2017-09-26T13:56:05Z"
+		},
+		{
 			"checksumSHA1": "jxa5QGd5XWyonlS+O/C9Fadmafc=",
 			"path": "github.com/yudai/gojsondiff",
 			"revision": "0525c875b75ca60b9e67ddc44496aa16f21066b0",

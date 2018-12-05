@@ -61,6 +61,7 @@ func main() {
 
 	options := apidiff.Options{
 		Verbose: *verbose,
+		Name:    *name,
 	}
 
 	ad := apidiff.New(directoryPath, options)
@@ -93,6 +94,7 @@ func main() {
 	}
 
 	if *recordCmd || *compareCmd {
+		// reads manifest from STDIN or path as last CLI arg
 		reader := os.Stdin
 		filename := ""
 		if flag.NArg() > 0 {
@@ -111,13 +113,14 @@ func main() {
 				os.Exit(1)
 			}
 
-			s := apidiff.RecordedSession{}
-			urls, err := ad.ReadURLs(s, reader)
-			if err != nil {
-				printErrorf("Unable to read input URLs due to %s", err)
-				os.Exit(1)
+			s := apidiff.RecordedSession{
+				Name: *name,
 			}
-			fmt.Printf("DEBUG: urls=%+v\n", urls)
+			m := apidiff.NewManifest()
+			m.Parse(reader)
+
+			fmt.Printf("DEBUG: session=%+v\n", s)
+			fmt.Printf("DEBUG: manifest=%+v\n", *m)
 		}
 	}
 }
