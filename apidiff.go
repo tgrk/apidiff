@@ -6,10 +6,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/dnaeon/go-vcr/cassette"
 	"github.com/dnaeon/go-vcr/recorder"
 	"github.com/tcnksm/go-httpstat"
 	"gopkg.in/yaml.v2"
@@ -29,9 +32,18 @@ type Options struct {
 
 // RecordedSession represents stored API session
 type RecordedSession struct {
-	Name    string
-	Path    string
-	Created time.Time
+	Name         string
+	Path         string
+	Interactions []RecordedInteraction
+	Created      time.Time
+}
+
+// RecordedInteraction represents recorded API interaction
+type RecordedInteraction struct {
+	URL        string
+	Method     string
+	StatusCode int
+	Stats      RequestStats
 }
 
 // RequestStats hold HTTP stats metrics
@@ -41,10 +53,6 @@ type RequestStats struct {
 	TLSHandshake     int `yaml:"tls_andshake"`
 	ServerProcessing int `yaml:"server_rocessing"`
 	ContentTransfer  int `yaml:"content_transfer"`
-}
-
-func (rs RecordedSession) String() string {
-	return fmt.Sprintf("Name: %s, Created: %s\n", rs.Name, rs.Created.Format("2006-01-02 15:04:05"))
 }
 
 // New creates a new instance
@@ -74,6 +82,64 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 		}
 	}
 	return sessions, nil
+}
+
+// Show returns an existing recorded session otherwise an error
+func (ad *APIDiff) Show(name string) (RecordedSession, error) {
+	session := RecordedSession{}
+
+	files, err := ioutil.ReadDir(ad.DirectoryPath)
+	if err != nil {
+		return session, err
+	}
+
+	var found = false
+	for _, file := range files {
+		if file.IsDir() && name == file.Name() {
+			sessionPath := path.Join(ad.DirectoryPath, file.Name())
+			session = RecordedSession{
+				Name:    file.Name(),
+				Path:    sessionPath,
+				Created: file.ModTime(),
+			}
+
+			paths, err := ad.listInteractions(sessionPath)
+			if err != nil {
+				return session, err
+			}
+
+			// iterates over saved interactions
+			for _, p := range paths {
+				// parse interactions
+				c, err := ad.loadCassette(p)
+				if err != nil {
+					continue
+				}
+
+				// parse interaction stats
+				stats, err := ad.loadRequestStats(p)
+				if err != nil {
+					continue
+				}
+
+				interaction := RecordedInteraction{
+					URL:        c.Request.URL,
+					Method:     c.Request.Method,
+					StatusCode: c.Response.Code,
+					Stats:      *stats,
+				}
+				session.Interactions = append(session.Interactions, interaction)
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return session, fmt.Errorf("Unable to find session %q", name)
+	}
+
+	return session, nil
 }
 
 // Record stores requested URL using casettes into a defined
@@ -117,13 +183,14 @@ func (ad *APIDiff) Record(name string, ri RequestInfo) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
-	err = ad.writeRequestStats(name, ri.URL, stats)
+	err = ad.writeRequestStats(path, ri.URL, stats)
 	if err != nil {
-		return fmt.Errorf("Unable to write request stats due to %s", err)
+		return fmt.Errorf("Unable to write request stats - %s", err)
 	}
 
-	return resp.Body.Close()
+	return nil
 }
 
 // Compare compare two stored sessions
@@ -146,9 +213,34 @@ func (ad *APIDiff) Compare() error {
 	return nil
 }
 
-func (ad *APIDiff) writeRequestStats(name, url string, result httpstat.Result) error {
-	filename := fmt.Sprintf("%s_stats.yaml", ad.getURLHash(url))
-	path := path.Join(ad.DirectoryPath, name, filename)
+// Delete an existing recorded session; otherwise returns error
+func (ad *APIDiff) Delete(name string) error {
+	path := path.Join(ad.DirectoryPath, name)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return err
+	}
+
+	if ad.Options.Verbose {
+		fmt.Printf("Recorded session %q was removed...\n", name)
+	}
+
+	return os.RemoveAll(path)
+}
+
+func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) error {
+	dirpath := filepath.Dir(path)
+	if _, err := os.Stat(dirpath); os.IsNotExist(err) {
+		if err := os.MkdirAll(dirpath, os.ModePerm); err != nil {
+			return err
+		}
+	}
+
+	filepath := fmt.Sprintf("%s_stats.yaml", path)
+	file, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
 	stats := RequestStats{
 		DNSLookup:        int(result.DNSLookup / time.Millisecond),
@@ -163,11 +255,14 @@ func (ad *APIDiff) writeRequestStats(name, url string, result httpstat.Result) e
 		return err
 	}
 
-	err = ioutil.WriteFile(path, output, 0644)
+	_, err = file.Write(output)
 	if err != nil {
 		return err
 	}
 
+	if ad.Options.Verbose {
+		fmt.Printf("Writing request metrics for %q into %q\"...\n", url, filepath)
+	}
 	return nil
 }
 
@@ -177,6 +272,44 @@ func (ad *APIDiff) isValidURL(strURL string) bool {
 		return false
 	}
 	return true
+}
+
+func (ad *APIDiff) listInteractions(basePath string) ([]string, error) {
+	paths := []string{}
+
+	files, err := ioutil.ReadDir(basePath)
+	if err != nil {
+		return paths, err
+	}
+
+	for _, file := range files {
+		if !file.IsDir() && !strings.HasSuffix(file.Name(), "_stats.yaml") {
+			paths = append(paths, path.Join(basePath, file.Name()))
+		}
+	}
+	return paths, err
+}
+
+func (ad *APIDiff) loadCassette(path string) (*cassette.Interaction, error) {
+	c, err := cassette.Load(path)
+	if err != nil {
+		return nil, err
+	}
+	return c.Interactions[0], nil
+}
+
+func (ad *APIDiff) loadRequestStats(path string) (*RequestStats, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &RequestStats{}
+	err = yaml.Unmarshal(data, stats)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 func (ad *APIDiff) getURLHash(url string) string {

@@ -13,9 +13,7 @@
             "mode": "auto",
             "program": "${fileDirname}",
             "env": {},
-            "args": [
-                "-list"
-            ],
+            "args": [],
             "trace": "verbose",
             "showLog": true
         }

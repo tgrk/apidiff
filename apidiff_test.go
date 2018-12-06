@@ -1,12 +1,15 @@
 package apidiff
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
 	"testing"
+)
+
+const (
+	sessionName = "foo"
 )
 
 func TestListCommand(t *testing.T) {
@@ -24,6 +27,35 @@ func TestListCommand(t *testing.T) {
 	if len(sessions) != 0 {
 		t.Errorf("Expected %q to be empty", path)
 	}
+}
+
+func TestRecordCommand(t *testing.T) {
+	path, err := makeTempStorageDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeTempStorageDirectory(path)
+
+	ad := New(path, Options{Verbose: true})
+	manifest := readExampleManifest(t)
+
+	for _, request := range manifest.Requests {
+		err = ad.Record(sessionName, request)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	sessions, err := ad.List()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(sessions) == 0 {
+		t.Errorf("Expected to have 1 recorded session but got %d", len(sessions))
+	}
+
+	//TODO: test exact session was recorded and has interactions
 }
 
 func TestManifestParsing(t *testing.T) {
@@ -45,35 +77,6 @@ func TestManifestParsing(t *testing.T) {
 	if reflect.DeepEqual(expected, manifest) {
 		t.Errorf("Expect manifest to be equal to %+v got %+v", expected, manifest)
 	}
-}
-
-func TestRecord(t *testing.T) {
-	path, err := makeTempStorageDirectory()
-	if err != nil {
-		t.Fatal(err)
-	}
-	//defer removeTempStorageDirectory(path)
-
-	ad := New(path, Options{Verbose: true})
-	manifest := readExampleManifest(t)
-
-	fmt.Printf("DEBUG: manifest=%+v\n", manifest)
-
-	// sessionName := "foo"
-
-	// for _, request := range manifest.Requests {
-	// 	err = ad.Record(sessionName, request)
-	// 	if err != nil {
-	// 		t.Error(err)
-	// 	}
-	// }
-
-	sessions, err := ad.List()
-	if err != nil {
-		t.Error(err)
-	}
-
-	fmt.Printf("DEBUG: sessions=%+v\n", sessions)
 }
 
 func TestIsValidURL(t *testing.T) {

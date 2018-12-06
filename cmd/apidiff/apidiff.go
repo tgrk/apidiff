@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
 	"os/user"
 	"path"
+	"strconv"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/tgrk/apidiff"
@@ -79,32 +81,70 @@ func main() {
 				rows = append(rows, []string{
 					session.Name,
 					session.Path,
+					strconv.Itoa(len(session.Interactions)),
 					session.Created.Format("2006-01-02 15:04:05"),
 				})
 			}
 
+			fmt.Println()
 			table := tablewriter.NewWriter(os.Stdout)
 			table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 			table.SetCenterSeparator("|")
-			table.SetHeader([]string{"Name", "Path", "Created"})
+			table.SetHeader([]string{"Name", "Path", "# Interactions", "Created"})
 			table.SetAutoMergeCells(true)
 			table.AppendBulk(rows)
 			table.Render()
+			fmt.Println()
+		}
+	}
+
+	if *showCmd {
+		if *name == "" {
+			printErrorln("Missing session name (-name \"foo\")")
+			os.Exit(1)
+		}
+
+		session, err := ad.Show(*name)
+		if err != nil {
+			printErrorf("Unable to show recorded session due to %s", err)
+			os.Exit(1)
+		}
+
+		//TODO: print details using table
+		fmt.Printf("SHOW: %+v\n", session)
+	}
+
+	if *deleteCmd {
+		if *name == "" {
+			printErrorln("Missing session name (-name \"foo\")")
+			os.Exit(1)
+		}
+
+		err := ad.Delete(*name)
+		if err != nil {
+			printErrorf("Unable to show recorded session due to %s", err)
+			os.Exit(1)
 		}
 	}
 
 	if *recordCmd || *compareCmd {
 		// reads manifest from STDIN or path as last CLI arg
-		reader := os.Stdin
+		reader := bufio.NewReader(os.Stdin)
 		filename := ""
 		if flag.NArg() > 0 {
 			filename = flag.Arg(0)
 			f, err := os.Open(filename)
 			if err != nil {
 				printErrorf("Unable to read source file %q!", filename, err)
+				os.Exit(1)
 			}
 			defer f.Close()
-			reader = f
+			reader = bufio.NewReader(f)
+		}
+
+		if filename == "" || reader.Size() == 0 {
+			printErrorln("No manifest supplied.")
+			os.Exit(1)
 		}
 
 		if *recordCmd {
@@ -113,14 +153,29 @@ func main() {
 				os.Exit(1)
 			}
 
-			s := apidiff.RecordedSession{
+			session := apidiff.RecordedSession{
 				Name: *name,
 			}
-			m := apidiff.NewManifest()
-			m.Parse(reader)
 
-			fmt.Printf("DEBUG: session=%+v\n", s)
-			fmt.Printf("DEBUG: manifest=%+v\n", *m)
+			manifest := apidiff.NewManifest()
+			err := manifest.Parse(reader)
+			if err != nil {
+				printErrorf("Unable to parse source manifest due to %s", err)
+				os.Exit(1)
+			}
+
+			for _, request := range manifest.Requests {
+				err = ad.Record(session.Name, request)
+				if err != nil {
+					printErrorf("Unable to record session due to %s", err)
+				}
+			}
+
+			//TODO: print some duration etc
+
+			if ad.Options.Verbose {
+				printInfoln("Recording finished")
+			}
 		}
 	}
 }
@@ -143,6 +198,10 @@ func getDefaultDirectory() (string, error) {
 		return "", err
 	}
 	return path.Join(usr.HomeDir, ".apidiff"), nil
+}
+
+func printInfoln(message string) {
+	fmt.Fprintln(os.Stdout, message)
 }
 
 func printErrorln(message string) {
