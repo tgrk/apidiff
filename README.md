@@ -4,15 +4,21 @@
 
 
 # API Diff
-Records API calls and compares the
+
+Records HTTP API (JSON based) calls and compares the them on both HTTP and JSON level. This is helpful when migrating or refactoring APIs to make sure your API contract did not change. It also stores basic performance metrics.
 
 ## Installation
+
+```bash
+$ go get github.com/tgrk/apidiff
+
+```
 
 ## Usage
 
 ```bash
 $ apidiff -h
-Usage of ./apidiff:
+Usage of apidiff:
   -compare
     	compare recorded sessions against a URL
   -del
@@ -34,7 +40,7 @@ Usage of ./apidiff:
   -source string
     	source recorded session for comparison
   -target string
-    	target recorded session for comparision
+    	target recorded session for comparison
   -v	prints current program version
   -verbose
     	output basic progress
@@ -43,36 +49,37 @@ Usage of ./apidiff:
 
 ### Record a new session
 
-Reads from both CLI arguments and STDIN:
-* single URL
-* path to list of URLs in file (each on new line)
-* STDIN
+Reads [manifest file](example/simple.yaml) from both CLI arguments and STDIN:
 
 ```bash
-$ ./appidiff -record -name "foo" https://api.chucknorris.io/jokes/random
+appidiff -record -name "foo" example/simple.yaml
 ```
 
 ```bash
-$ ./appidiff -record -name "foo" https://api.chucknorris.io/jokes/random
+$ cat example/simple.yaml | ./appidiff -record -name "foo"
 ```
 
 ### List all existing sessions
 ```bash
-$ ./appidiff -list
+appidiff -list
 ```
 
 ### Show an existing session
 ```bash
-$ ./appidiff -show "foo"
+appidiff -show "foo"
 ```
 
 ### Delete an existing session
 ```bash
-$ ./appidiff -del "foo"
+appidiff -del "foo"
 ```
 
-### Compare an existing sessions agains an URI
+### Compare an existing sessions
 ```bash
-$ ./appidiff -compare -name "foo" https://api.chucknorris.io/jokes/random
+appidiff -compare -source "foo" -target "bar"
 ```
 
+Or compare existing session againgst a manifest with other API:
+```bash
+appidiff -compare -name "bar" example/simple.yaml
+```
