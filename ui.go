@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/olekukonko/tablewriter"
 )
@@ -68,8 +67,4 @@ func (ui *UI) ShowSessionDetail(session RecordedSession) {
 
 		fmt.Println()
 	}
-}
-
-func (ui *UI) drawLine(count int) {
-	fmt.Printf("+%s\n", strings.Repeat("=", count))
 }
