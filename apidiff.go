@@ -78,6 +78,14 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 				Path:    path.Join(ad.DirectoryPath, file.Name()),
 				Created: file.ModTime(),
 			}
+
+			// here we just need number of interactions so we will
+			// not load full details here
+			paths, _ := ad.listInteractions(session.Path)
+			for i := 0; i < len(paths); i++ {
+				dummy := RecordedInteraction{}
+				session.Interactions = append(session.Interactions, dummy)
+			}
 			sessions = append(sessions, session)
 		}
 	}
@@ -96,7 +104,7 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 	var found = false
 	for _, file := range files {
 		if file.IsDir() && name == file.Name() {
-			sessionPath := path.Join(ad.DirectoryPath, file.Name())
+			sessionPath := path.Join(ad.DirectoryPath, name)
 			session = RecordedSession{
 				Name:    file.Name(),
 				Path:    sessionPath,
@@ -110,23 +118,9 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 
 			// iterates over saved interactions
 			for _, p := range paths {
-				// parse interactions
-				c, err := ad.loadCassette(p)
+				interaction, err := ad.loadInteraction(p)
 				if err != nil {
 					continue
-				}
-
-				// parse interaction stats
-				stats, err := ad.loadRequestStats(p)
-				if err != nil {
-					continue
-				}
-
-				interaction := RecordedInteraction{
-					URL:        c.Request.URL,
-					Method:     c.Request.Method,
-					StatusCode: c.Response.Code,
-					Stats:      *stats,
 				}
 				session.Interactions = append(session.Interactions, interaction)
 			}
@@ -290,8 +284,33 @@ func (ad *APIDiff) listInteractions(basePath string) ([]string, error) {
 	return paths, err
 }
 
+func (ad *APIDiff) loadInteraction(path string) (RecordedInteraction, error) {
+	interaction := RecordedInteraction{}
+
+	// parse interactions
+	c, err := ad.loadCassette(path)
+	if err != nil {
+		return interaction, err
+	}
+
+	// parse interaction stats
+	stats, err := ad.loadRequestStats(path)
+	if err != nil {
+		return interaction, nil
+	}
+
+	interaction = RecordedInteraction{
+		URL:        c.Request.URL,
+		Method:     c.Request.Method,
+		StatusCode: c.Response.Code,
+		Stats:      *stats,
+	}
+
+	return interaction, nil
+}
+
 func (ad *APIDiff) loadCassette(path string) (*cassette.Interaction, error) {
-	c, err := cassette.Load(path)
+	c, err := cassette.Load(strings.Replace(path, ".yaml", "", 1))
 	if err != nil {
 		return nil, err
 	}

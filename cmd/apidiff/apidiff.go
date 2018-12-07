@@ -7,9 +7,8 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"strconv"
+	"time"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/tgrk/apidiff"
 )
 
@@ -61,6 +60,8 @@ func main() {
 		}
 	}
 
+	ui := apidiff.NewUI()
+
 	options := apidiff.Options{
 		Verbose: *verbose,
 		Name:    *name,
@@ -73,28 +74,11 @@ func main() {
 		if err != nil {
 			printErrorf("Unable to list recorded sessions due to %s", err)
 		}
+
 		if len(sessions) == 0 {
 			fmt.Println("No recorded sessions found")
 		} else {
-			rows := [][]string{}
-			for _, session := range sessions {
-				rows = append(rows, []string{
-					session.Name,
-					session.Path,
-					strconv.Itoa(len(session.Interactions)),
-					session.Created.Format("2006-01-02 15:04:05"),
-				})
-			}
-
-			fmt.Println()
-			table := tablewriter.NewWriter(os.Stdout)
-			table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-			table.SetCenterSeparator("|")
-			table.SetHeader([]string{"Name", "Path", "# Interactions", "Created"})
-			table.SetAutoMergeCells(true)
-			table.AppendBulk(rows)
-			table.Render()
-			fmt.Println()
+			ui.ListSessions(sessions, true)
 		}
 	}
 
@@ -110,8 +94,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		//TODO: print details using table
-		fmt.Printf("SHOW: %+v\n", session)
+		ui.ShowSessionDetail(session)
 	}
 
 	if *deleteCmd {
@@ -122,9 +105,23 @@ func main() {
 
 		err := ad.Delete(*name)
 		if err != nil {
-			printErrorf("Unable to show recorded session due to %s", err)
+			printErrorf("Unable to delete recorded session due to %s", err)
 			os.Exit(1)
 		}
+	}
+
+	if *compareCmd {
+		if *source == "" {
+			printErrorln("Missing source session name (-source \"foo\")")
+			os.Exit(1)
+		}
+
+		//TODO: compare also just using source and manifest input
+		if *target == "" {
+			printErrorln("Missing target session name (-target \"bar\")")
+			os.Exit(1)
+		}
+
 	}
 
 	if *recordCmd || *compareCmd {
@@ -164,6 +161,8 @@ func main() {
 				os.Exit(1)
 			}
 
+			start := time.Now()
+
 			for _, request := range manifest.Requests {
 				err = ad.Record(session.Name, request)
 				if err != nil {
@@ -171,10 +170,10 @@ func main() {
 				}
 			}
 
-			//TODO: print some duration etc
-
 			if ad.Options.Verbose {
-				printInfoln("Recording finished")
+				elapsed := time.Since(start)
+
+				fmt.Fprintf(os.Stdout, "Recording finished in %0.3f seconds...\n", elapsed.Seconds())
 			}
 		}
 	}
