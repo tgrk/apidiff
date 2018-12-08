@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -55,7 +56,29 @@ func TestRecordCommand(t *testing.T) {
 		t.Errorf("Expected to have 1 recorded session but got %d", len(sessions))
 	}
 
-	//TODO: test exact session was recorded and has interactions
+	session := sessions[0]
+	if session.Name != sessionName {
+		t.Errorf("Expect to have session name %q but got %q", sessionName, session.Name)
+	}
+
+	if len(session.Interactions) == 0 {
+		t.Error("Expect to have a recorded interaction but got none")
+	}
+
+	interaction := session.Interactions[0]
+	expectedRequest := manifest.Requests[0]
+	if expectedRequest.URL != interaction.URL {
+		t.Errorf("Expected to record URL %q but got %q",
+			expectedRequest.URL,
+			interaction.URL,
+		)
+	}
+	if strings.ToLower(expectedRequest.Method) != strings.ToLower(interaction.Method) {
+		t.Errorf("Expected to record %q request but got %q",
+			expectedRequest.Method,
+			interaction.Method,
+		)
+	}
 }
 
 func TestManifestParsing(t *testing.T) {
@@ -99,7 +122,7 @@ func TestIsValidURL(t *testing.T) {
 }
 
 func readExampleManifest(t *testing.T) *Manifest {
-	path := path.Join("example", "simple.yaml")
+	path := path.Join("examples", "simple.yaml")
 
 	reader, err := os.Open(path)
 	if err != nil {

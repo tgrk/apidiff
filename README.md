@@ -49,14 +49,14 @@ Usage of apidiff:
 
 ### Record a new session
 
-Reads [manifest file](example/simple.yaml) from both CLI arguments and STDIN:
+Reads [manifest file](examples/simple.yaml) from both CLI arguments and STDIN:
 
 ```bash
-appidiff -record -name "foo" example/simple.yaml
+appidiff -record -name "foo" examples/simple.yaml
 ```
 
 ```bash
-$ cat example/simple.yaml | ./appidiff -record -name "foo"
+$ cat examples/simple.yaml | ./appidiff -record -name "foo"
 ```
 
 ### List all existing sessions
@@ -81,5 +81,5 @@ appidiff -compare -source "foo" -target "bar"
 
 Or compare existing session againgst a manifest with other API:
 ```bash
-appidiff -compare -name "bar" example/simple.yaml
+appidiff -compare -name "bar" examples/simple.yaml
 ```

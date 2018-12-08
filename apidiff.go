@@ -79,12 +79,15 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 				Created: file.ModTime(),
 			}
 
-			// here we just need number of interactions so we will
-			// not load full details here
+			// iterates over saved interactions
 			paths, _ := ad.listInteractions(session.Path)
-			for i := 0; i < len(paths); i++ {
-				dummy := RecordedInteraction{}
-				session.Interactions = append(session.Interactions, dummy)
+
+			for _, p := range paths {
+				interaction, err := ad.loadInteraction(p)
+				if err != nil {
+					continue
+				}
+				session.Interactions = append(session.Interactions, interaction)
 			}
 			sessions = append(sessions, session)
 		}
