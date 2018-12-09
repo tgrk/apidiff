@@ -114,7 +114,7 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 // Record stores requested URL using casettes into a defined
 // directory
 func (ad *APIDiff) Record(name string, ri RequestInfo) error {
-	path := path.Join(ad.DirectoryPath, name, ad.getURLHash(ri.URL))
+	path := path.Join(ad.getPath(name), ad.getURLHash(ri.URL))
 
 	if ad.Options.Verbose {
 		fmt.Printf("Recording %q to \"%s.yaml\"...\n", ri.URL, path)
@@ -168,6 +168,8 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) []error {
 	//TODO: load interactions
 	//TODO: match on source and target urls or index?
 	// source.Path
+	fmt.Printf("DEBUG: source=%+v\n", source)
+	fmt.Printf("DEBUG: target=%+v\n", target)
 
 	var errors = []error{}
 
@@ -178,6 +180,7 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) []error {
 	defer r.Stop()
 
 	rules := target.MatchingRules
+	fmt.Printf("DEBUG: rules=%+v\n", rules)
 
 	r.SetMatcher(func(r *http.Request, i cassette.Request) bool {
 		var b bytes.Buffer
@@ -196,6 +199,8 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) []error {
 		// 		//TODO: compare headers
 		// 	}
 		// }
+		fmt.Printf("DEBUG: req=%+v\n", r)
+		fmt.Printf("DEBUG: casette=%+v\n", i)
 
 		sourceBody := b.Bytes()
 		targetBody := []byte(i.Body)
@@ -212,9 +217,9 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) []error {
 			matching = false
 		}
 
-		if rules.MatchURL {
-			matching = cassette.DefaultMatcher(r, i)
-		}
+		// if rules[0].MatchURL {
+		// 	matching = cassette.DefaultMatcher(r, i)
+		// }
 
 		return matching
 	})
@@ -228,7 +233,7 @@ func (ad *APIDiff) compareInteraction(source, target RecordedInteraction) {
 
 // Delete an existing recorded session; otherwise returns error
 func (ad *APIDiff) Delete(name string) error {
-	path := path.Join(ad.DirectoryPath, name)
+	path := ad.getPath(name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return err
 	}
@@ -348,6 +353,10 @@ func (ad *APIDiff) loadRequestStats(path string) (*RequestStats, error) {
 		return nil, err
 	}
 	return stats, nil
+}
+
+func (ad *APIDiff) getPath(name string) string {
+	return path.Join(ad.DirectoryPath, name)
 }
 
 func (ad *APIDiff) getURLHash(url string) string {

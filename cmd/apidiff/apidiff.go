@@ -106,16 +106,6 @@ func main() {
 		}
 	}
 
-	if *compareCmd {
-		if *name == "" {
-			printErrorln("Missing source session name (-name \"foo\")")
-			os.Exit(1)
-		}
-
-		//TODO: compare also just using source and manifest input
-
-	}
-
 	if *recordCmd || *compareCmd {
 		// reads manifest from STDIN or path as last CLI arg
 		reader := bufio.NewReader(os.Stdin)
@@ -166,6 +156,34 @@ func main() {
 				elapsed := time.Since(start)
 
 				fmt.Fprintf(os.Stdout, "Recording finished in %0.3f seconds...\n", elapsed.Seconds())
+			}
+		}
+
+		if *compareCmd {
+			if *name == "" {
+				printErrorln("Missing source session name (-name \"foo\")")
+				os.Exit(1)
+			}
+
+			sourceSession, err := ad.Show(*name)
+			if err != nil {
+				printErrorln("Missing session name (-name \"foo\")")
+				os.Exit(1)
+			}
+
+			targetManifest := apidiff.NewManifest()
+			err = targetManifest.Parse(reader)
+			if err != nil {
+				printErrorf("Unable to parse target manifest due to %s", err)
+				os.Exit(1)
+			}
+
+			//TODO: compare also just using source and manifest input
+			errors := ad.Compare(sourceSession, *targetManifest)
+			if len(errors) > 0 {
+				fmt.Printf("DEBUG: compare=%+v\n", errors)
+			} else {
+				printInfoln("Success. No differences found")
 			}
 		}
 	}

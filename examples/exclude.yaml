@@ -1,9 +1,11 @@
 version: 1
 matching_rules:
-  - match_url: False
-  - ignore_headers:
-    - Authorize
-    - Date
+  - name: "match_url"
+    value: True
+  - name: "ignore_headers"
+    value:
+      - Authorize
+      - Date
 
 requests:
   - name: "Retrieve a random chuck joke in JSON format."

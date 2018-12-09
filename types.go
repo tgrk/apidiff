@@ -38,8 +38,8 @@ type RequestStats struct {
 
 // MatchingRules contains filter to be applied to stored interactions
 type MatchingRules struct {
-	MatchURL      bool
-	IgnoreHeaders []http.Header
+	Name  string      `yaml:"name"`
+	Value interface{} `yaml:"value"`
 }
 
 // RequestInfo contains API request details
