@@ -29,11 +29,7 @@ var (
 
 	// command specific
 	name      = flag.String("name", "", "name of session to be recorded")
-	source    = flag.String("source", "", "source recorded session for comparison")
-	target    = flag.String("target", "", "target recorded session for comparision")
 	directory = flag.String("dir", "", "path where API calls are stored (default $HOME/.apidiff/)")
-	headers   = flag.String("headers", "", "HTTP headers to use for API request (eg. Content-Type or Authorize)")
-	excludes  = flag.String("excludes", "", "exclude specified HTTP headers from comparison (eg. Date or Authorize)")
 )
 
 func main() {
@@ -111,16 +107,12 @@ func main() {
 	}
 
 	if *compareCmd {
-		if *source == "" {
-			printErrorln("Missing source session name (-source \"foo\")")
+		if *name == "" {
+			printErrorln("Missing source session name (-name \"foo\")")
 			os.Exit(1)
 		}
 
 		//TODO: compare also just using source and manifest input
-		if *target == "" {
-			printErrorln("Missing target session name (-target \"bar\")")
-			os.Exit(1)
-		}
 
 	}
 

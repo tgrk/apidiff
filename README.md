@@ -18,17 +18,14 @@ $ go get github.com/tgrk/apidiff
 
 ```bash
 $ apidiff -h
-Usage of apidiff:
+Usage: apidiff [OPTIONS] argument ...
+
   -compare
     	compare recorded sessions against a URL
   -del
     	list all recorded API sessions
   -dir string
     	path where API calls are stored (default $HOME/.apidiff/)
-  -excludes string
-    	exclude specified HTTP headers from comparison (eg. Date or Authorize)
-  -headers string
-    	HTTP headers to use for API request (eg. Content-Type or Authorize)
   -list
     	list all recorded API sessions
   -name string
@@ -37,10 +34,6 @@ Usage of apidiff:
     	record a new API session
   -show
     	list all recorded API sessions
-  -source string
-    	source recorded session for comparison
-  -target string
-    	target recorded session for comparison
   -v	prints current program version
   -verbose
     	output basic progress
@@ -74,12 +67,9 @@ appidiff -show "foo"
 appidiff -del "foo"
 ```
 
-### Compare an existing sessions
-```bash
-appidiff -compare -source "foo" -target "bar"
-```
+### Compare against an existing sessions
 
-Or compare existing session againgst a manifest with other API:
+Compare existing session against a manifest with other API:
 ```bash
 appidiff -compare -name "bar" examples/simple.yaml
 ```

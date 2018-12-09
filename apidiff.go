@@ -1,6 +1,7 @@
 package apidiff
 
 import (
+	"bytes"
 	"fmt"
 	"hash/fnv"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/dnaeon/go-vcr/cassette"
 	"github.com/dnaeon/go-vcr/recorder"
 	"github.com/tcnksm/go-httpstat"
+	"github.com/yudai/gojsondiff"
 	"gopkg.in/yaml.v2"
 )
 
@@ -22,37 +24,6 @@ import (
 type APIDiff struct {
 	DirectoryPath string
 	Options       Options
-}
-
-// Options holds shared CLI arguments from user
-type Options struct {
-	Verbose bool
-	Name    string
-}
-
-// RecordedSession represents stored API session
-type RecordedSession struct {
-	Name         string
-	Path         string
-	Interactions []RecordedInteraction
-	Created      time.Time
-}
-
-// RecordedInteraction represents recorded API interaction
-type RecordedInteraction struct {
-	URL        string
-	Method     string
-	StatusCode int
-	Stats      RequestStats
-}
-
-// RequestStats hold HTTP stats metrics
-type RequestStats struct {
-	DNSLookup        int `yaml:"dns_lookup"`
-	TCPConnection    int `yaml:"tcp_connection"`
-	TLSHandshake     int `yaml:"tls_andshake"`
-	ServerProcessing int `yaml:"server_rocessing"`
-	ContentTransfer  int `yaml:"content_transfer"`
 }
 
 // New creates a new instance
@@ -92,6 +63,7 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 			sessions = append(sessions, session)
 		}
 	}
+
 	return sessions, nil
 }
 
@@ -191,23 +163,67 @@ func (ad *APIDiff) Record(name string, ri RequestInfo) error {
 }
 
 // Compare compare two stored sessions
-func (ad *APIDiff) Compare() error {
-	// r, err := recorder.New("fixtures/matchers")
-	// if err != nil {
-	// 	return err
-	// }
-	// defer r.Stop()
+func (ad *APIDiff) Compare(source RecordedSession, target Manifest) []error {
 
-	// r.SetMatcher(func(r *http.Request, i cassette.Request) bool {
-	// 	var b bytes.Buffer
-	// 	if _, err := b.ReadFrom(r.Body); err != nil {
-	// 		return false
-	// 	}
-	// 	r.Body = ioutil.NopCloser(&b)
-	// 	return cassette.DefaultMatcher(r, i) && (b.String() == "" || b.String() == i.Body)
-	// })
+	//TODO: load interactions
+	//TODO: match on source and target urls or index?
+	// source.Path
 
-	return nil
+	var errors = []error{}
+
+	r, err := recorder.New("fixtures/matchers")
+	if err != nil {
+		return errors
+	}
+	defer r.Stop()
+
+	rules := target.MatchingRules
+
+	r.SetMatcher(func(r *http.Request, i cassette.Request) bool {
+		var b bytes.Buffer
+		if _, err := b.ReadFrom(r.Body); err != nil {
+			return false
+		}
+		r.Body = ioutil.NopCloser(&b)
+
+		var matching = true
+
+		//TODO: apply excludes
+		// for _, header := range r.Header {
+
+		// for _, header := range rules.IgnoreHeaders {
+		// 	for _, header := range filter.Headers {
+		// 		//TODO: compare headers
+		// 	}
+		// }
+
+		sourceBody := b.Bytes()
+		targetBody := []byte(i.Body)
+
+		// compare body using JSON diff
+		jd := gojsondiff.New()
+		diff, err := jd.Compare(sourceBody, targetBody)
+		if err != nil {
+			errors = append(errors, err)
+			matching = false
+		}
+		if diff.Modified() {
+			fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
+			matching = false
+		}
+
+		if rules.MatchURL {
+			matching = cassette.DefaultMatcher(r, i)
+		}
+
+		return matching
+	})
+
+	return errors
+}
+
+func (ad *APIDiff) compareInteraction(source, target RecordedInteraction) {
+
 }
 
 // Delete an existing recorded session; otherwise returns error

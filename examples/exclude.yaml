@@ -1,6 +1,7 @@
 version: 1
-exclude:
-  - headers:
+matching_rules:
+  - match_url: False
+  - ignore_headers:
     - Authorize
     - Date
 

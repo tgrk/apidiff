@@ -3,16 +3,10 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "jbMuOwNfeGgHQPHX6NECj+1O/Kc=",
-			"path": "github.com/dnaeon/go-vcr/cassette",
-			"revision": "5637cf3d8a31b20882d79bd0e53a186d3821b155",
-			"revisionTime": "2018-09-20T04:04:54Z"
-		},
-		{
-			"checksumSHA1": "NbU9JGgKmtEYRUd2K0Fq7fjxmOA=",
-			"path": "github.com/dnaeon/go-vcr/recorder",
-			"revision": "5637cf3d8a31b20882d79bd0e53a186d3821b155",
-			"revisionTime": "2018-09-20T04:04:54Z"
+			"checksumSHA1": "ir0TUXTbIteZzSHHM/2rLSWfIjY=",
+			"path": "github.com/dnaeon/go-vcr",
+			"revision": "91ac6c0e83e363761b827b42bd61226ba3a37374",
+			"revisionTime": "2018-11-27T13:48:37Z"
 		},
 		{
 			"checksumSHA1": "5LK/JjBog0PqfJb9GUvuAXfqvYU=",
