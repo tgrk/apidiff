@@ -79,12 +79,17 @@ func main() {
 	}
 
 	if *showCmd {
-		if *name == "" {
+		sessionName := *name
+		if flag.NArg() > 0 {
+			sessionName = flag.Arg(0)
+		}
+
+		if sessionName == "" {
 			printErrorln("Missing session name (-name \"foo\")")
 			os.Exit(1)
 		}
 
-		session, err := ad.Show(*name)
+		session, err := ad.Show(sessionName)
 		if err != nil {
 			printErrorf("Unable to show recorded session due to %s", err)
 			os.Exit(1)
@@ -94,13 +99,16 @@ func main() {
 	}
 
 	if *deleteCmd {
-		if *name == "" {
+		sessionName := *name
+		if flag.NArg() > 0 {
+			sessionName = flag.Arg(0)
+		}
+		if sessionName == "" {
 			printErrorln("Missing session name (-name \"foo\")")
 			os.Exit(1)
 		}
 
-		err := ad.Delete(*name)
-		if err != nil {
+		if err := ad.Delete(sessionName); err != nil {
 			printErrorf("Unable to delete recorded session due to %s", err)
 			os.Exit(1)
 		}
@@ -114,7 +122,7 @@ func main() {
 			filename = flag.Arg(0)
 			f, err := os.Open(filename)
 			if err != nil {
-				printErrorf("Unable to read source file %q!", filename, err)
+				printErrorf("Unable to read source file %q", filename)
 				os.Exit(1)
 			}
 			defer f.Close()
@@ -146,7 +154,7 @@ func main() {
 			start := time.Now()
 
 			for _, request := range manifest.Requests {
-				err = ad.Record(session.Name, request)
+				err = ad.Record(session.Name, request, nil)
 				if err != nil {
 					printErrorf("Unable to record session due to %s", err)
 				}
