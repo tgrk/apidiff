@@ -41,7 +41,7 @@ func TestRecordCommand(t *testing.T) {
 	manifest := readExampleManifest(t)
 
 	for _, request := range manifest.Requests {
-		err = ad.Record(sessionName, request)
+		err = ad.Record(sessionName, request, []MatchingRules{})
 		if err != nil {
 			t.Error(err)
 		}

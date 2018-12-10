@@ -113,7 +113,7 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 
 // Record stores requested URL using casettes into a defined
 // directory
-func (ad *APIDiff) Record(name string, ri RequestInfo) error {
+func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) error {
 	path := path.Join(ad.getPath(name), ad.getURLHash(ri.URL))
 
 	if ad.Options.Verbose {
@@ -126,10 +126,58 @@ func (ad *APIDiff) Record(name string, ri RequestInfo) error {
 	}
 	defer r.Stop()
 
+	fmt.Printf("DEBUG: recorder=%+v\n", r)
+
 	// ri.Payload
 	req, err := http.NewRequest(strings.ToUpper(ri.Method), ri.URL, nil)
 	if err != nil {
 		return err
+	}
+
+	if len(rules) > 0 {
+		r.SetMatcher(func(r *http.Request, c cassette.Request) bool {
+			var b bytes.Buffer
+			if _, err := b.ReadFrom(r.Body); err != nil {
+				return false
+			}
+			r.Body = ioutil.NopCloser(&b)
+
+			var matching = true
+
+			//TODO: apply excludes
+			// for _, header := range r.Header {
+
+			// for _, header := range rules.IgnoreHeaders {
+			// 	for _, header := range filter.Headers {
+			// 		//TODO: compare headers
+			// 	}
+			// }
+			fmt.Printf("DEBUG: req=%+v\n", r)
+			fmt.Printf("DEBUG: casette=%+v\n", c)
+
+			sourceBody := b.Bytes()
+			targetBody := []byte(c.Body)
+
+			// compare body using JSON diff
+			jd := gojsondiff.New()
+			diff, err := jd.Compare(sourceBody, targetBody)
+			if err != nil {
+				fmt.Printf("DEBUG: diff=%+v\n", err)
+				//TODO: what about using channel to pass errors back?
+				//errors[ad.getURLHash(r.URL)] = err
+				matching = false
+			}
+			if diff.Modified() {
+				fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
+				matching = false
+			}
+
+			// if rules[0].MatchURL {
+			// 	matching = cassette.DefaultMatcher(r, i)
+			// }
+
+			return matching
+		})
 	}
 
 	for headerKey, headerValue := range ri.Headers {
@@ -163,7 +211,7 @@ func (ad *APIDiff) Record(name string, ri RequestInfo) error {
 }
 
 // Compare compare two stored sessions
-func (ad *APIDiff) Compare(source RecordedSession, target Manifest) []error {
+func (ad *APIDiff) Compare(source RecordedSession, target Manifest) map[int]error {
 
 	//TODO: load interactions
 	//TODO: match on source and target urls or index?
@@ -171,58 +219,21 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) []error {
 	fmt.Printf("DEBUG: source=%+v\n", source)
 	fmt.Printf("DEBUG: target=%+v\n", target)
 
-	var errors = []error{}
+	var errors = make(map[int]error, 0)
 
-	r, err := recorder.New("fixtures/matchers")
-	if err != nil {
-		return errors
-	}
-	defer r.Stop()
+	for _, request := range target.Requests {
+		// ri := source.Interactions[i]
 
-	rules := target.MatchingRules
-	fmt.Printf("DEBUG: rules=%+v\n", rules)
+		rules := target.MatchingRules
+		fmt.Printf("DEBUG: rules=%+v\n", rules)
 
-	r.SetMatcher(func(r *http.Request, i cassette.Request) bool {
-		var b bytes.Buffer
-		if _, err := b.ReadFrom(r.Body); err != nil {
-			return false
-		}
-		r.Body = ioutil.NopCloser(&b)
-
-		var matching = true
-
-		//TODO: apply excludes
-		// for _, header := range r.Header {
-
-		// for _, header := range rules.IgnoreHeaders {
-		// 	for _, header := range filter.Headers {
-		// 		//TODO: compare headers
-		// 	}
-		// }
-		fmt.Printf("DEBUG: req=%+v\n", r)
-		fmt.Printf("DEBUG: casette=%+v\n", i)
-
-		sourceBody := b.Bytes()
-		targetBody := []byte(i.Body)
-
-		// compare body using JSON diff
-		jd := gojsondiff.New()
-		diff, err := jd.Compare(sourceBody, targetBody)
+		//TODO: verbose
+		err := ad.Record(source.Name, request, rules)
 		if err != nil {
-			errors = append(errors, err)
-			matching = false
-		}
-		if diff.Modified() {
-			fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
-			matching = false
+			//TODO: logging
 		}
 
-		// if rules[0].MatchURL {
-		// 	matching = cassette.DefaultMatcher(r, i)
-		// }
-
-		return matching
-	})
+	}
 
 	return errors
 }
