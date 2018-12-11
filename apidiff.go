@@ -1,7 +1,6 @@
 package apidiff
 
 import (
-	"bytes"
 	"fmt"
 	"hash/fnv"
 	"io/ioutil"
@@ -111,8 +110,7 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 	return session, nil
 }
 
-// Record stores requested URL using casettes into a defined
-// directory
+// Record stores requested URL using casettes into a defined directory
 func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) error {
 	path := path.Join(ad.getPath(name), ad.getURLHash(ri.URL))
 
@@ -126,58 +124,37 @@ func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) er
 	}
 	defer r.Stop()
 
-	fmt.Printf("DEBUG: recorder=%+v\n", r)
+	// custom request matcher based on specified rules
+	r.SetMatcher(func(r *http.Request, cr cassette.Request) bool {
+		if len(rules) > 0 {
+			for _, rule := range rules {
+				if rule.Name == "match_url" {
+					return rule.Value.(bool)
+				}
+			}
+		}
 
-	// ri.Payload
+		return cassette.DefaultMatcher(r, cr)
+	})
+
+	// custom filter for stored request data
+	r.AddFilter(func(ci *cassette.Interaction) error {
+		if len(rules) > 0 {
+			for _, rule := range rules {
+				if rule.Name == "ignore_headers" {
+					for _, headerKey := range rule.Value.([]string) {
+						delete(ci.Request.Headers, headerKey)
+					}
+				}
+			}
+		}
+		return nil
+	})
+
+	//TODO: ri.Payload
 	req, err := http.NewRequest(strings.ToUpper(ri.Method), ri.URL, nil)
 	if err != nil {
 		return err
-	}
-
-	if len(rules) > 0 {
-		r.SetMatcher(func(r *http.Request, c cassette.Request) bool {
-			var b bytes.Buffer
-			if _, err := b.ReadFrom(r.Body); err != nil {
-				return false
-			}
-			r.Body = ioutil.NopCloser(&b)
-
-			var matching = true
-
-			//TODO: apply excludes
-			// for _, header := range r.Header {
-
-			// for _, header := range rules.IgnoreHeaders {
-			// 	for _, header := range filter.Headers {
-			// 		//TODO: compare headers
-			// 	}
-			// }
-			fmt.Printf("DEBUG: req=%+v\n", r)
-			fmt.Printf("DEBUG: casette=%+v\n", c)
-
-			sourceBody := b.Bytes()
-			targetBody := []byte(c.Body)
-
-			// compare body using JSON diff
-			jd := gojsondiff.New()
-			diff, err := jd.Compare(sourceBody, targetBody)
-			if err != nil {
-				fmt.Printf("DEBUG: diff=%+v\n", err)
-				//TODO: what about using channel to pass errors back?
-				//errors[ad.getURLHash(r.URL)] = err
-				matching = false
-			}
-			if diff.Modified() {
-				fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
-				matching = false
-			}
-
-			// if rules[0].MatchURL {
-			// 	matching = cassette.DefaultMatcher(r, i)
-			// }
-
-			return matching
-		})
 	}
 
 	for headerKey, headerValue := range ri.Headers {
@@ -219,13 +196,11 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) map[int]erro
 	fmt.Printf("DEBUG: source=%+v\n", source)
 	fmt.Printf("DEBUG: target=%+v\n", target)
 
-	var errors = make(map[int]error, 0)
+	rules := target.MatchingRules
 
+	var errors = make(map[int]error, 0)
 	for _, request := range target.Requests {
 		// ri := source.Interactions[i]
-
-		rules := target.MatchingRules
-		fmt.Printf("DEBUG: rules=%+v\n", rules)
 
 		//TODO: verbose
 		err := ad.Record(source.Name, request, rules)
@@ -238,8 +213,35 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) map[int]erro
 	return errors
 }
 
-func (ad *APIDiff) compareInteraction(source, target RecordedInteraction) {
+func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) []error {
+	errors := make([]error, 0)
 
+	// basic request comparison
+	sr := source.Request
+	tr := target.Request
+
+	//TODO: push errors
+
+	//TODO: compare headers
+	// for _, header := range rules.IgnoreHeaders {
+	// 	for _, header := range filter.Headers {
+	// 		//TODO: compare headers
+	// 	}
+	// }
+
+	// compare body using JSON diff
+	jd := gojsondiff.New()
+	diff, err := jd.Compare([]byte(sr.Body), []byte(tr.Body))
+	if err != nil {
+		fmt.Printf("DEBUG: diff=%+v\n", err)
+		//TODO: what about using channel to pass errors back?
+		//errors[ad.getURLHash(r.URL)] = err
+	}
+	if diff.Modified() {
+		fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
+	}
+
+	return errors
 }
 
 // Delete an existing recorded session; otherwise returns error
