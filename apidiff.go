@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -50,7 +51,10 @@ func (ad *APIDiff) List() ([]RecordedSession, error) {
 			}
 
 			// iterates over saved interactions
-			paths, _ := ad.listInteractions(session.Path)
+			paths, err := ad.listInteractions(session.Path)
+			if err != nil {
+				return sessions, err
+			}
 
 			for _, p := range paths {
 				interaction, err := ad.loadInteraction(p)
@@ -111,8 +115,8 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 }
 
 // Record stores requested URL using casettes into a defined directory
-func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) error {
-	path := path.Join(ad.getPath(name), ad.getURLHash(ri.URL))
+func (ad *APIDiff) Record(dir, name string, ri RequestInfo, rules []MatchingRules) error {
+	path := path.Join(ad.getPath(dir, name), ad.getURLHash(ri.URL))
 
 	if ad.Options.Verbose {
 		fmt.Printf("Recording %q to \"%s.yaml\"...\n", ri.URL, path)
@@ -122,7 +126,11 @@ func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) er
 	if err != nil {
 		return err
 	}
-	defer r.Stop()
+	defer func() {
+		if err = r.Stop(); err != nil {
+			panic(err)
+		}
+	}()
 
 	// custom request matcher based on specified rules
 	r.SetMatcher(func(r *http.Request, cr cassette.Request) bool {
@@ -142,8 +150,8 @@ func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) er
 		if len(rules) > 0 {
 			for _, rule := range rules {
 				if rule.Name == "ignore_headers" {
-					for _, headerKey := range rule.Value.([]string) {
-						delete(ci.Request.Headers, headerKey)
+					for _, headerKey := range rule.Value.([]interface{}) {
+						delete(ci.Request.Headers, headerKey.(string))
 					}
 				}
 			}
@@ -177,7 +185,11 @@ func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) er
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	err = ad.writeRequestStats(path, ri.URL, stats)
 	if err != nil {
@@ -187,30 +199,55 @@ func (ad *APIDiff) Record(name string, ri RequestInfo, rules []MatchingRules) er
 	return nil
 }
 
-// Compare compare two stored sessions
-func (ad *APIDiff) Compare(source RecordedSession, target Manifest) map[int]error {
-
-	//TODO: load interactions
-	//TODO: match on source and target urls or index?
-	// source.Path
-	fmt.Printf("DEBUG: source=%+v\n", source)
-	fmt.Printf("DEBUG: target=%+v\n", target)
-
+// Compare compare stored session against a manifest
+func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int][]error, error) {
+	var results = make(map[int][]error)
 	rules := target.MatchingRules
 
-	var errors = make(map[int]error, 0)
-	for _, request := range target.Requests {
-		// ri := source.Interactions[i]
-
-		//TODO: verbose
-		err := ad.Record(source.Name, request, rules)
-		if err != nil {
-			//TODO: logging
-		}
-
+	// create temp location for target cassettes
+	tcDir, err := ioutil.TempDir("/tmp", "apidifftest")
+	if err != nil {
+		return results, err
 	}
 
-	return errors
+	scPath := ad.getPath(ad.DirectoryPath, source.Name)
+
+	for i, tr := range target.Requests {
+		// record target into temporary location
+		err := ad.Record(tcDir, source.Name, tr, rules)
+		if err != nil {
+			return results, err
+		}
+
+		// wait for cassette untill it is store in FS
+		targetCassettePath := path.Join(tcDir, source.Name, ad.getURLHash(tr.URL))
+		if err = ad.waitForFile(fmt.Sprintf("%s.yaml", targetCassettePath), 0); err != nil {
+			return results, err
+		}
+
+		// load target cassette
+		tc, err := cassette.Load(targetCassettePath)
+		if err != nil {
+			return results, err
+		}
+
+		// load source cassette
+		si := source.Interactions[i]
+		sc, err := cassette.Load(path.Join(scPath, ad.getURLHash(si.URL)))
+		if err != nil {
+			return results, err
+		}
+
+		// do comparison and collect errors
+		results[i] = ad.compareInteractions(rules, *sc.Interactions[0], *tc.Interactions[0])
+	}
+
+	// finally cleanup all temporary resources
+	if err = os.RemoveAll(tcDir); err != nil {
+		return results, nil
+	}
+
+	return results, nil
 }
 
 func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) []error {
@@ -220,24 +257,26 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 	sr := source.Request
 	tr := target.Request
 
-	//TODO: push errors
-
-	//TODO: compare headers
-	// for _, header := range rules.IgnoreHeaders {
-	// 	for _, header := range filter.Headers {
-	// 		//TODO: compare headers
-	// 	}
-	// }
+	// compare headers
+	for sk, sv := range sr.Headers {
+		tv, found := tr.Headers[sk]
+		if !found {
+			errors = append(errors, fmt.Errorf("header %q is missing", sk))
+		}
+		if !reflect.DeepEqual(sv, tv) {
+			errors = append(errors, fmt.Errorf("header %q value should be %v but got %v", sk, sv, tv))
+		}
+	}
 
 	// compare body using JSON diff
 	jd := gojsondiff.New()
 	diff, err := jd.Compare([]byte(sr.Body), []byte(tr.Body))
 	if err != nil {
-		fmt.Printf("DEBUG: diff=%+v\n", err)
-		//TODO: what about using channel to pass errors back?
-		//errors[ad.getURLHash(r.URL)] = err
+		return errors
 	}
+
 	if diff.Modified() {
+		//TODO: serialize deltas into errors?
 		fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
 	}
 
@@ -246,7 +285,7 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 
 // Delete an existing recorded session; otherwise returns error
 func (ad *APIDiff) Delete(name string) error {
-	path := ad.getPath(name)
+	path := ad.getPath(ad.DirectoryPath, name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return err
 	}
@@ -267,11 +306,15 @@ func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) e
 	}
 
 	filepath := fmt.Sprintf("%s_stats.yaml", path)
-	file, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE, 0666)
+	file, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err = file.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	stats := RequestStats{
 		DNSLookup:        int(result.DNSLookup / time.Millisecond),
@@ -368,12 +411,26 @@ func (ad *APIDiff) loadRequestStats(path string) (*RequestStats, error) {
 	return stats, nil
 }
 
-func (ad *APIDiff) getPath(name string) string {
-	return path.Join(ad.DirectoryPath, name)
+func (ad *APIDiff) waitForFile(path string, retry int) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if retry <= 50 {
+			time.Sleep(100 * time.Millisecond)
+			return ad.waitForFile(path, retry+1)
+		}
+		return fmt.Errorf("unable to read file %q within time", path)
+	}
+	return nil
+}
+
+func (ad *APIDiff) getPath(dir, name string) string {
+	return path.Join(dir, name)
 }
 
 func (ad *APIDiff) getURLHash(url string) string {
 	h := fnv.New32a()
-	h.Write([]byte(url))
+	_, err := h.Write([]byte(url))
+	if err != nil {
+		panic(err)
+	}
 	return fmt.Sprint(h.Sum32())
 }
