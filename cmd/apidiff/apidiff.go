@@ -22,7 +22,7 @@ var (
 
 	// commands
 	recordCmd  = flag.Bool("record", false, "record a new API session")
-	compareCmd = flag.Bool("compare", false, "compare recorded sessions against a URL")
+	compareCmd = flag.Bool("compare", false, "compare recorded session against a URL")
 	listCmd    = flag.Bool("list", false, "list all recorded API sessions")
 	deleteCmd  = flag.Bool("del", false, "list all recorded API sessions")
 	showCmd    = flag.Bool("show", false, "list all recorded API sessions")
@@ -154,7 +154,7 @@ func main() {
 			start := time.Now()
 
 			for _, request := range manifest.Requests {
-				err = ad.Record(session.Name, request, nil)
+				err = ad.Record(ad.DirectoryPath, session.Name, request, nil)
 				if err != nil {
 					printErrorf("Unable to record session due to %s", err)
 				}
@@ -187,7 +187,11 @@ func main() {
 			}
 
 			//TODO: compare also just using source and manifest input
-			errors := ad.Compare(sourceSession, *targetManifest)
+			errors, err := ad.Compare(sourceSession, *targetManifest)
+			if err != nil {
+				printErrorf("Unable to compare sessions due to %s", err)
+				os.Exit(1)
+			}
 			if len(errors) > 0 {
 				fmt.Printf("DEBUG: compare=%+v\n", errors)
 			} else {

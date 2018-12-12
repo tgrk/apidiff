@@ -250,39 +250,6 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int][]e
 	return results, nil
 }
 
-func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) []error {
-	errors := make([]error, 0)
-
-	// basic request comparison
-	sr := source.Request
-	tr := target.Request
-
-	// compare headers
-	for sk, sv := range sr.Headers {
-		tv, found := tr.Headers[sk]
-		if !found {
-			errors = append(errors, fmt.Errorf("header %q is missing", sk))
-		}
-		if !reflect.DeepEqual(sv, tv) {
-			errors = append(errors, fmt.Errorf("header %q value should be %v but got %v", sk, sv, tv))
-		}
-	}
-
-	// compare body using JSON diff
-	jd := gojsondiff.New()
-	diff, err := jd.Compare([]byte(sr.Body), []byte(tr.Body))
-	if err != nil {
-		return errors
-	}
-
-	if diff.Modified() {
-		//TODO: serialize deltas into errors?
-		fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
-	}
-
-	return errors
-}
-
 // Delete an existing recorded session; otherwise returns error
 func (ad *APIDiff) Delete(name string) error {
 	path := ad.getPath(ad.DirectoryPath, name)
@@ -338,6 +305,39 @@ func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) e
 		fmt.Printf("Writing request metrics for %q into %q\"...\n", url, filepath)
 	}
 	return nil
+}
+
+func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) []error {
+	errors := make([]error, 0)
+
+	// basic request comparison
+	sr := source.Request
+	tr := target.Request
+
+	// compare headers
+	for sk, sv := range sr.Headers {
+		tv, found := tr.Headers[sk]
+		if !found {
+			errors = append(errors, fmt.Errorf("header %q is missing", sk))
+		}
+		if !reflect.DeepEqual(sv, tv) {
+			errors = append(errors, fmt.Errorf("header %q value should be %v but got %v", sk, sv, tv))
+		}
+	}
+
+	// compare body using JSON diff
+	jd := gojsondiff.New()
+	diff, err := jd.Compare([]byte(sr.Body), []byte(tr.Body))
+	if err != nil {
+		return errors
+	}
+
+	if diff.Modified() {
+		//TODO: serialize deltas into errors?
+		fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
+	}
+
+	return errors
 }
 
 func (ad *APIDiff) isValidURL(strURL string) bool {

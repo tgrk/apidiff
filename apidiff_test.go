@@ -16,13 +16,13 @@ const (
 func TestListCommand(t *testing.T) {
 	path, err := makeTempStorageDirectory()
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	ad := New(path, Options{})
 	sessions, err := ad.List()
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	if len(sessions) != 0 {
@@ -33,7 +33,7 @@ func TestListCommand(t *testing.T) {
 func TestRecordCommand(t *testing.T) {
 	path, err := makeTempStorageDirectory()
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	defer removeTempStorageDirectory(path)
 
@@ -41,15 +41,15 @@ func TestRecordCommand(t *testing.T) {
 	manifest := readExampleManifest(t)
 
 	for _, request := range manifest.Requests {
-		err = ad.Record(sessionName, request, []MatchingRules{})
+		err = ad.Record(path, sessionName, request, []MatchingRules{})
 		if err != nil {
-			t.Error(err)
+			panic(err)
 		}
 	}
 
 	sessions, err := ad.List()
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
 
 	if len(sessions) == 0 {
@@ -126,13 +126,13 @@ func readExampleManifest(t *testing.T) *Manifest {
 
 	reader, err := os.Open(path)
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
 	defer reader.Close()
 
 	manifest := NewManifest()
 	if err := manifest.Parse(reader); err != nil {
-		t.Error(err)
+		panic(err)
 	}
 
 	return manifest
