@@ -28,9 +28,5 @@ func (m *Manifest) Parse(r io.Reader) error {
 		return err
 	}
 
-	err = yaml.Unmarshal(buf.Bytes(), m)
-	if err != nil {
-		return err
-	}
-	return nil
+	return yaml.Unmarshal(buf.Bytes(), m)
 }
