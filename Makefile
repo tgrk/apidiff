@@ -35,7 +35,7 @@ verboseTest:
 
 .PHONY: lint
 lint:
-	gometalinter
+	gometalinter -D gosec
 
 .PHONY: cover
 cover:
