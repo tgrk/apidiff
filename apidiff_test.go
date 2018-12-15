@@ -1,6 +1,7 @@
 package apidiff
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -53,7 +54,7 @@ func TestRecordCommand(t *testing.T) {
 	}
 
 	if len(sessions) == 0 {
-		t.Errorf("Expected to have 1 recorded session but got %d", len(sessions))
+		t.Fatalf("Expected to have 1 recorded session but got %d", len(sessions))
 	}
 
 	session := sessions[0]
@@ -62,8 +63,10 @@ func TestRecordCommand(t *testing.T) {
 	}
 
 	if len(session.Interactions) == 0 {
-		t.Error("Expect to have a recorded interaction but got none")
+		t.Fatalf("Expect to have a recorded interaction but got none")
 	}
+
+	fmt.Printf("DEBUG: session=%+v\n", session)
 
 	interaction := session.Interactions[0]
 	expectedRequest := manifest.Requests[0]

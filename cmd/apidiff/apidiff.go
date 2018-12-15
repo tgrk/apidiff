@@ -186,7 +186,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			//TODO: compare also just using source and manifest input
 			errors, err := ad.Compare(sourceSession, *targetManifest)
 			if err != nil {
 				printErrorf("Unable to compare sessions due to %s", err)

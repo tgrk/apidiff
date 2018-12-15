@@ -3,6 +3,7 @@ package apidiff
 import (
 	"fmt"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -122,7 +123,7 @@ func (ad *APIDiff) Record(dir, name string, ri RequestInfo, rules []MatchingRule
 		fmt.Printf("Recording %q to \"%s.yaml\"...\n", ri.URL, path)
 	}
 
-	r, err := recorder.New(path)
+	r, err := ad.createRecorder(path, rules)
 	if err != nil {
 		return err
 	}
@@ -132,35 +133,13 @@ func (ad *APIDiff) Record(dir, name string, ri RequestInfo, rules []MatchingRule
 		}
 	}()
 
-	// custom request matcher based on specified rules
-	r.SetMatcher(func(r *http.Request, cr cassette.Request) bool {
-		if len(rules) > 0 {
-			for _, rule := range rules {
-				if rule.Name == "match_url" {
-					return rule.Value.(bool)
-				}
-			}
-		}
+	// create request from manifest defintion
+	var payload io.Reader
+	if ri.Payload != "" {
+		payload = strings.NewReader(ri.Payload)
+	}
 
-		return cassette.DefaultMatcher(r, cr)
-	})
-
-	// custom filter for stored request data
-	r.AddFilter(func(ci *cassette.Interaction) error {
-		if len(rules) > 0 {
-			for _, rule := range rules {
-				if rule.Name == "ignore_headers" {
-					for _, headerKey := range rule.Value.([]interface{}) {
-						delete(ci.Request.Headers, headerKey.(string))
-					}
-				}
-			}
-		}
-		return nil
-	})
-
-	//TODO: ri.Payload
-	req, err := http.NewRequest(strings.ToUpper(ri.Method), ri.URL, nil)
+	req, err := http.NewRequest(strings.ToUpper(ri.Method), ri.URL, payload)
 	if err != nil {
 		return err
 	}
@@ -214,12 +193,12 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int][]e
 
 	for i, tr := range target.Requests {
 		// record target into temporary location
-		err := ad.Record(tcDir, source.Name, tr, rules)
+		err = ad.Record(tcDir, source.Name, tr, rules)
 		if err != nil {
 			return results, err
 		}
 
-		// wait for cassette untill it is store in FS
+		// wait for cassette until it is store in FS
 		targetCassettePath := path.Join(tcDir, source.Name, ad.getURLHash(tr.URL))
 		if err = ad.waitForFile(fmt.Sprintf("%s.yaml", targetCassettePath), 0); err != nil {
 			return results, err
@@ -338,6 +317,42 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 	}
 
 	return errors
+}
+
+func (ad *APIDiff) createRecorder(path string, rules []MatchingRules) (*recorder.Recorder, error) {
+	r, err := recorder.New(path)
+	if err != nil {
+		return r, err
+	}
+
+	// custom request matcher based on specified rules
+	r.SetMatcher(func(r *http.Request, cr cassette.Request) bool {
+		if len(rules) > 0 {
+			for _, rule := range rules {
+				if rule.Name == "match_url" {
+					return rule.Value.(bool)
+				}
+			}
+		}
+
+		return cassette.DefaultMatcher(r, cr)
+	})
+
+	// custom filter for stored request data
+	r.AddFilter(func(ci *cassette.Interaction) error {
+		if len(rules) > 0 {
+			for _, rule := range rules {
+				if rule.Name == "ignore_headers" {
+					for _, headerKey := range rule.Value.([]interface{}) {
+						delete(ci.Request.Headers, headerKey.(string))
+					}
+				}
+			}
+		}
+		return nil
+	})
+
+	return r, err
 }
 
 func (ad *APIDiff) isValidURL(strURL string) bool {
