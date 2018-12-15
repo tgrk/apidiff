@@ -289,12 +289,31 @@ func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) e
 func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) []error {
 	errors := make([]error, 0)
 
-	// basic request comparison
-	sr := source.Request
-	tr := target.Request
+	// basic response comparison
+	sr := source.Response
+	tr := target.Response
+
+	fmt.Printf("DEBUG: sr=%+v\n", sr)
+	fmt.Printf("DEBUG: tr=%+v\n", tr)
+
+	// header ignore rules
+	ignoreHeaders := make(map[string]bool)
+	for _, rule := range rules {
+		if rule.Name == "ignore_headers" {
+			for _, headerKey := range rule.Value.([]interface{}) {
+				ignoreHeaders[headerKey.(string)] = true
+			}
+			break
+		}
+	}
 
 	// compare headers
 	for sk, sv := range sr.Headers {
+		// skip excluded headers
+		if _, found := ignoreHeaders[sk]; found {
+			continue
+		}
+
 		tv, found := tr.Headers[sk]
 		if !found {
 			errors = append(errors, fmt.Errorf("header %q is missing", sk))

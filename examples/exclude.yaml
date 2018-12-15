@@ -6,6 +6,8 @@ matching_rules:
     value:
       - Authorize
       - Date
+      - Set-Cookie
+      - Cf-Ray
 
 requests:
   - name: "Retrieve a random chuck joke in JSON format."
