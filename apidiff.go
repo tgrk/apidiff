@@ -1,6 +1,7 @@
 package apidiff
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -18,8 +19,14 @@ import (
 	"github.com/dnaeon/go-vcr/recorder"
 	"github.com/tcnksm/go-httpstat"
 	"github.com/yudai/gojsondiff"
+	"github.com/yudai/gojsondiff/formatter"
 	"gopkg.in/yaml.v2"
 )
+
+var formatterConfig = formatter.AsciiFormatterConfig{
+	ShowArrayIndex: true,
+	Coloring:       true,
+}
 
 // APIDiff instance
 type APIDiff struct {
@@ -218,7 +225,11 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int][]e
 		}
 
 		// do comparison and collect errors
-		results[i] = ad.compareInteractions(rules, *sc.Interactions[0], *tc.Interactions[0])
+		result, err := ad.compareInteractions(rules, *sc.Interactions[0], *tc.Interactions[0])
+		if err != nil {
+			return results, err
+		}
+		results[i] = result
 	}
 
 	// finally cleanup all temporary resources
@@ -286,15 +297,15 @@ func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) e
 	return nil
 }
 
-func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) []error {
+func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) ([]error, error) {
 	errors := make([]error, 0)
 
 	// basic response comparison
 	sr := source.Response
 	tr := target.Response
 
-	fmt.Printf("DEBUG: sr=%+v\n", sr)
-	fmt.Printf("DEBUG: tr=%+v\n", tr)
+	// fmt.Printf("DEBUG: sr=%+v\n", sr)
+	// fmt.Printf("DEBUG: tr=%+v\n", tr)
 
 	// header ignore rules
 	ignoreHeaders := make(map[string]bool)
@@ -327,15 +338,26 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 	jd := gojsondiff.New()
 	diff, err := jd.Compare([]byte(sr.Body), []byte(tr.Body))
 	if err != nil {
-		return errors
+		return errors, err
 	}
 
 	if diff.Modified() {
-		//TODO: serialize deltas into errors?
-		fmt.Printf("DEBUG: deltas=%+v\n", diff.Deltas())
+		// get source JSON for showing difference
+		var diffJSON map[string]interface{}
+		err := json.Unmarshal([]byte(sr.Body), &diffJSON)
+		if err != nil {
+			return errors, err
+		}
+
+		formatter := formatter.NewAsciiFormatter(diffJSON, formatterConfig)
+		diffString, err := formatter.Format(diff)
+		if err != nil {
+			return errors, err
+		}
+		errors = append(errors, fmt.Errorf("%s", diffString))
 	}
 
-	return errors
+	return errors, nil
 }
 
 func (ad *APIDiff) createRecorder(path string, rules []MatchingRules) (*recorder.Recorder, error) {

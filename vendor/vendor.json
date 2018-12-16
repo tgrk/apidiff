@@ -39,6 +39,12 @@
 			"revisionTime": "2018-05-04T02:02:46Z"
 		},
 		{
+			"checksumSHA1": "50gdo5Kq0/gEKG1A4agCPOZ26JA=",
+			"path": "github.com/yudai/gojsondiff/formatter",
+			"revision": "0525c875b75ca60b9e67ddc44496aa16f21066b0",
+			"revisionTime": "2018-05-04T02:02:46Z"
+		},
+		{
 			"checksumSHA1": "5xoBoioS8LWHn9FC0pL+vo7wDjs=",
 			"path": "github.com/yudai/golcs",
 			"revision": "ecda9a501e8220fae3b4b600c3db4b0ba22cfc68",
