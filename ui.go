@@ -77,7 +77,7 @@ func (ui *UI) ShowComparisonResults(source RecordedSession, errors map[int]Diffe
 	} else {
 		total := 0
 		rows := [][]string{}
-		for i, _ := range source.Interactions {
+		for i := range source.Interactions {
 			err := errors[i]
 			for headerKey, headerValue := range err.Headers {
 				rows = append(rows, []string{
