@@ -49,3 +49,11 @@ type RequestInfo struct {
 	Payload string      `yaml:"body"`
 	Headers http.Header `yaml:"headers"`
 }
+
+// Differences represents errors between two interactions
+type Differences struct {
+	URL              string
+	InteractionIndex int
+	Headers          map[string]error
+	Body             map[string]error
+}

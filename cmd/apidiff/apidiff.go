@@ -192,7 +192,7 @@ func main() {
 				os.Exit(1)
 			}
 			if len(errors) > 0 {
-				fmt.Printf("DEBUG: compare=%+v\n", errors)
+				ui.ShowComparisonResults(sourceSession, errors)
 			} else {
 				printInfoln("Success. No differences found")
 			}

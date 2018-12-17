@@ -68,3 +68,43 @@ func (ui *UI) ShowSessionDetail(session RecordedSession) {
 		fmt.Println()
 	}
 }
+
+// ShowComparisonResults displays result of comparing source and target
+// sessions
+func (ui *UI) ShowComparisonResults(source RecordedSession, errors map[int]Differences) {
+	if len(source.Interactions) == 0 {
+		fmt.Println("| No recorded session interactions found")
+	} else {
+		total := 0
+		rows := [][]string{}
+		for i, _ := range source.Interactions {
+			err := errors[i]
+			for headerKey, headerValue := range err.Headers {
+				rows = append(rows, []string{
+					source.Name,
+					fmt.Sprintf("Header %s", headerKey),
+					headerValue.Error(),
+				})
+			}
+			for _, bodyValue := range err.Body {
+				rows = append(rows, []string{
+					source.Name,
+					"Body",
+					bodyValue.Error(),
+				})
+			}
+			total++
+		}
+
+		fmt.Println()
+
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetCenterSeparator("|")
+		table.SetHeader([]string{"Session", "Type", "Difference"})
+		table.SetCaption(true, fmt.Sprintf(" Total %d errors(s)", total))
+		table.AppendBulk(rows)
+		table.Render()
+
+		fmt.Println()
+	}
+}

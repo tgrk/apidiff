@@ -2,6 +2,7 @@ package apidiff
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -186,8 +187,8 @@ func (ad *APIDiff) Record(dir, name string, ri RequestInfo, rules []MatchingRule
 }
 
 // Compare compare stored session against a manifest
-func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int][]error, error) {
-	var results = make(map[int][]error)
+func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int]Differences, error) {
+	var results = make(map[int]Differences)
 	rules := target.MatchingRules
 
 	// create temp location for target cassettes
@@ -297,8 +298,11 @@ func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) e
 	return nil
 }
 
-func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) ([]error, error) {
-	errors := make([]error, 0)
+func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) (Differences, error) {
+	result := Differences{
+		Headers: make(map[string]error),
+		Body:    make(map[string]error),
+	}
 
 	// basic response comparison
 	sr := source.Response
@@ -327,10 +331,10 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 
 		tv, found := tr.Headers[sk]
 		if !found {
-			errors = append(errors, fmt.Errorf("header %q is missing", sk))
+			result.Headers[sk] = errors.New("header is missing")
 		}
 		if !reflect.DeepEqual(sv, tv) {
-			errors = append(errors, fmt.Errorf("header %q value should be %v but got %v", sk, sv, tv))
+			result.Headers[sk] = fmt.Errorf("expect %v but got %v", sv, tv)
 		}
 	}
 
@@ -338,7 +342,7 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 	jd := gojsondiff.New()
 	diff, err := jd.Compare([]byte(sr.Body), []byte(tr.Body))
 	if err != nil {
-		return errors, err
+		return result, err
 	}
 
 	if diff.Modified() {
@@ -346,18 +350,18 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 		var diffJSON map[string]interface{}
 		err := json.Unmarshal([]byte(sr.Body), &diffJSON)
 		if err != nil {
-			return errors, err
+			return result, err
 		}
 
 		formatter := formatter.NewAsciiFormatter(diffJSON, formatterConfig)
 		diffString, err := formatter.Format(diff)
 		if err != nil {
-			return errors, err
+			return result, err
 		}
-		errors = append(errors, fmt.Errorf("%s", diffString))
+		result.Body["payload"] = fmt.Errorf("%s", diffString)
 	}
 
-	return errors, nil
+	return result, nil
 }
 
 func (ad *APIDiff) createRecorder(path string, rules []MatchingRules) (*recorder.Recorder, error) {
