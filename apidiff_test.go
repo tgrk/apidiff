@@ -1,7 +1,6 @@
 package apidiff
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -14,24 +13,7 @@ const (
 	sessionName = "foo"
 )
 
-func TestListCommand(t *testing.T) {
-	path, err := makeTempStorageDirectory()
-	if err != nil {
-		panic(err)
-	}
-
-	ad := New(path, Options{})
-	sessions, err := ad.List()
-	if err != nil {
-		panic(err)
-	}
-
-	if len(sessions) != 0 {
-		t.Errorf("Expected %q to be empty", path)
-	}
-}
-
-func TestRecordCommand(t *testing.T) {
+func TestSessionManagement(t *testing.T) {
 	path, err := makeTempStorageDirectory()
 	if err != nil {
 		panic(err)
@@ -39,8 +21,9 @@ func TestRecordCommand(t *testing.T) {
 	defer removeTempStorageDirectory(path)
 
 	ad := New(path, Options{Verbose: true})
-	manifest := readExampleManifest(t)
+	manifest := readExampleManifest("simple.yaml", t)
 
+	// record session based on example
 	for _, request := range manifest.Requests {
 		err = ad.Record(path, sessionName, request, []MatchingRules{})
 		if err != nil {
@@ -48,6 +31,7 @@ func TestRecordCommand(t *testing.T) {
 		}
 	}
 
+	// list created session
 	sessions, err := ad.List()
 	if err != nil {
 		panic(err)
@@ -57,7 +41,15 @@ func TestRecordCommand(t *testing.T) {
 		t.Fatalf("Expected to have 1 recorded session but got %d", len(sessions))
 	}
 
-	session := sessions[0]
+	// show an existing session
+	session, err := ad.Show(sessionName)
+	if err != nil {
+		panic(err)
+	}
+
+	if session.Created != sessions[0].Created {
+		t.Error("Expected to have same sessions but got different")
+	}
 	if session.Name != sessionName {
 		t.Errorf("Expect to have session name %q but got %q", sessionName, session.Name)
 	}
@@ -65,8 +57,6 @@ func TestRecordCommand(t *testing.T) {
 	if len(session.Interactions) == 0 {
 		t.Fatalf("Expect to have a recorded interaction but got none")
 	}
-
-	fmt.Printf("DEBUG: session=%+v\n", session)
 
 	interaction := session.Interactions[0]
 	expectedRequest := manifest.Requests[0]
@@ -82,10 +72,64 @@ func TestRecordCommand(t *testing.T) {
 			interaction.Method,
 		)
 	}
+
+	// delete existing session
+	err = ad.Delete(sessionName)
+	if err != nil {
+		panic(err)
+	}
+
+	// list created session
+	noSessions, err := ad.List()
+	if err != nil {
+		panic(err)
+	}
+
+	if len(noSessions) != 0 {
+		t.Errorf("Expected %q to be empty after deletion", path)
+	}
+}
+
+func TestCompareSameSession(t *testing.T) {
+	path, err := makeTempStorageDirectory()
+	if err != nil {
+		panic(err)
+	}
+
+	ad := New(path, Options{})
+	sessions, err := ad.List()
+	if err != nil {
+		panic(err)
+	}
+	if len(sessions) != 0 {
+		t.Errorf("Expect to have no session but got %d", len(sessions))
+	}
+
+	manifest := readExampleManifest("constant.yaml", t)
+
+	for _, request := range manifest.Requests {
+		err = ad.Record(path, sessionName, request, []MatchingRules{})
+		if err != nil {
+			panic(err)
+		}
+	}
+	session, err := ad.Show(sessionName)
+	if err != nil {
+		panic(err)
+	}
+
+	differences, err := ad.Compare(session, *manifest)
+	if err != nil {
+		panic(err)
+	}
+
+	if len(differences[0].Headers) != 0 && len(differences[0].Body) != 0 {
+		t.Error("Expect to have no differences for same manifest")
+	}
 }
 
 func TestManifestParsing(t *testing.T) {
-	manifest := readExampleManifest(t)
+	manifest := readExampleManifest("simple.yaml", t)
 
 	expected := Manifest{
 		Version: 1,
@@ -124,8 +168,8 @@ func TestIsValidURL(t *testing.T) {
 	}
 }
 
-func readExampleManifest(t *testing.T) *Manifest {
-	path := path.Join("examples", "simple.yaml")
+func readExampleManifest(filename string, t *testing.T) *Manifest {
+	path := path.Join("examples", filename)
 
 	reader, err := os.Open(path)
 	if err != nil {
