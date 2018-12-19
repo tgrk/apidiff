@@ -35,11 +35,12 @@ verboseTest:
 
 .PHONY: lint
 lint:
-	gometalinter -D gosec
+	gometalinter -D gosec vetshadow --cyclo-over=20
 
 .PHONY: cover
 cover:
-	go test -coverprofile fmt
+	go test -coverprofile /tmp/apidfiff.out
+	go tool cover -html=/tmp/apidfiff.out
 
 .PHONY: format
 format:
