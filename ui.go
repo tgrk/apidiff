@@ -82,25 +82,30 @@ func (ui *UI) ShowComparisonResults(source RecordedSession, errors map[int]Diffe
 			for headerKey, headerValue := range err.Headers {
 				rows = append(rows, []string{
 					source.Name,
+					strconv.Itoa(i),
 					fmt.Sprintf("Header %s", headerKey),
 					headerValue.Error(),
 				})
+				total++
 			}
 			for _, bodyValue := range err.Body {
 				rows = append(rows, []string{
 					source.Name,
+					strconv.Itoa(i),
 					"Body",
 					bodyValue.Error(),
 				})
+				total++
 			}
-			total++
 		}
 
 		fmt.Println()
 
 		table := tablewriter.NewWriter(os.Stdout)
+		table.SetRowLine(true)
+		table.SetAutoWrapText(false)
 		table.SetCenterSeparator("|")
-		table.SetHeader([]string{"Session", "Type", "Difference"})
+		table.SetHeader([]string{"Session", "# Interaction", "Type", "Difference"})
 		table.SetCaption(true, fmt.Sprintf(" Total %d errors(s)", total))
 		table.AppendBulk(rows)
 		table.Render()
