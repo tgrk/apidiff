@@ -1,0 +1,16 @@
+version: 1
+matching_rules:
+  - name: "match_url"
+    value: True
+  - name: "ignore_headers"
+    value:
+      - Date
+      - Cf-Ray
+
+requests:
+  - name: "Retrieve a single post by id that is contant (used for testing)."
+    url: "https://jsonplaceholder.typicode.com/posts/1"
+    method: "get"
+    headers:
+      Content-Type:
+        - application/json; charset=utf-8

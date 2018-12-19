@@ -16,3 +16,10 @@ requests:
     headers:
       Content-Type:
         - application/json; charset=utf-8
+  - name: ""
+    url: "https://randomuser.me/api/"
+    method: "get"
+    headers:
+      Content-Type:
+        - application/json; charset=utf-8
+
