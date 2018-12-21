@@ -21,11 +21,17 @@ func TestSessionManagement(t *testing.T) {
 	defer removeTempStorageDirectory(path)
 
 	ad := New(path, Options{Verbose: true})
-	manifest := readExampleManifest("simple.yaml", t)
+	manifest := readExampleManifest("constant.yaml", t)
 
 	// record session based on example
-	for _, request := range manifest.Requests {
-		err = ad.Record(path, sessionName, request, []MatchingRules{})
+	for _, interaction := range manifest.Interactions {
+		err = ad.Record(
+			path,
+			sessionName,
+			interaction,
+			manifest.Request,
+			manifest.MatchingRules,
+		)
 		if err != nil {
 			panic(err)
 		}
@@ -59,7 +65,7 @@ func TestSessionManagement(t *testing.T) {
 	}
 
 	interaction := session.Interactions[0]
-	expectedRequest := manifest.Requests[0]
+	expectedRequest := manifest.Interactions[0]
 	if expectedRequest.URL != interaction.URL {
 		t.Errorf("Expected to record URL %q but got %q",
 			expectedRequest.URL,
@@ -107,8 +113,14 @@ func TestCompareSameSession(t *testing.T) {
 
 	manifest := readExampleManifest("constant.yaml", t)
 
-	for _, request := range manifest.Requests {
-		err = ad.Record(path, sessionName, request, []MatchingRules{})
+	for _, interaction := range manifest.Interactions {
+		err = ad.Record(
+			path,
+			sessionName,
+			interaction,
+			manifest.Request,
+			manifest.MatchingRules,
+		)
 		if err != nil {
 			panic(err)
 		}
@@ -128,13 +140,60 @@ func TestCompareSameSession(t *testing.T) {
 	}
 }
 
+func TestCompareDifferentSession(t *testing.T) {
+	path, err := makeTempStorageDirectory()
+	if err != nil {
+		panic(err)
+	}
+
+	ad := New(path, Options{})
+	sessions, err := ad.List()
+	if err != nil {
+		panic(err)
+	}
+	if len(sessions) != 0 {
+		t.Errorf("Expect to have no session but got %d", len(sessions))
+	}
+
+	manifest := readExampleManifest("different.yaml", t)
+
+	for _, interaction := range manifest.Interactions {
+		err = ad.Record(
+			path,
+			sessionName,
+			interaction,
+			manifest.Request,
+			manifest.MatchingRules,
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+	session, err := ad.Show(sessionName)
+	if err != nil {
+		panic(err)
+	}
+
+	differences, err := ad.Compare(session, *manifest)
+	if err != nil {
+		panic(err)
+	}
+
+	if len(differences[0].Headers) == 0 {
+		t.Error("Expect to have different HTTP ETag header but got same")
+	}
+	if len(differences[0].Body) == 0 {
+		t.Error("Expect to have different JSON payload but got same")
+	}
+}
+
 func TestManifestParsing(t *testing.T) {
-	manifest := readExampleManifest("simple.yaml", t)
+	manifest := readExampleManifest("constant.yaml", t)
 
 	expected := Manifest{
 		Version: 1,
-		Requests: []RequestInfo{
-			RequestInfo{
+		Interactions: []RequestInteraction{
+			RequestInteraction{
 				URL:    "https://api.chucknorris.io/jokes/random",
 				Method: "get",
 				Headers: map[string][]string{

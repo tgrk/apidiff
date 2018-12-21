@@ -124,11 +124,14 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 }
 
 // Record stores requested URL using casettes into a defined directory
-func (ad *APIDiff) Record(dir, name string, ri RequestInfo, rules []MatchingRules) error {
-	path := path.Join(ad.getPath(dir, name), ad.getURLHash(ri.URL))
+func (ad *APIDiff) Record(dir, name string, interaction RequestInteraction, ri RequestInfo, rules []MatchingRules) error {
+	url := interaction.URL
+	method := strings.ToUpper(interaction.Method)
+
+	path := path.Join(ad.getPath(dir, name), ad.getURLHash(url))
 
 	if ad.Options.Verbose {
-		fmt.Printf("Recording %q to \"%s.yaml\"...\n", ri.URL, path)
+		fmt.Printf("Recording %q to \"%s.yaml\"...\n", url, path)
 	}
 
 	r, err := ad.createRecorder(path, rules)
@@ -147,11 +150,17 @@ func (ad *APIDiff) Record(dir, name string, ri RequestInfo, rules []MatchingRule
 		payload = strings.NewReader(ri.Payload)
 	}
 
-	req, err := http.NewRequest(strings.ToUpper(ri.Method), ri.URL, payload)
+	// send interaction specific payload
+	if interaction.Payload != "" {
+		payload = strings.NewReader(interaction.Payload)
+	}
+
+	req, err := http.NewRequest(method, url, payload)
 	if err != nil {
 		return err
 	}
 
+	//TODO: apply common and interaction specific HTTP headers
 	for headerKey, headerValue := range ri.Headers {
 		for _, childHeaderValue := range headerValue {
 			req.Header.Set(headerKey, childHeaderValue)
@@ -172,13 +181,19 @@ func (ad *APIDiff) Record(dir, name string, ri RequestInfo, rules []MatchingRule
 	if err != nil {
 		return err
 	}
+
+	if ad.Options.Verbose {
+		fmt.Printf("Request finished with status: %s\n", resp.Status)
+		fmt.Println("---")
+	}
+
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
 			panic(err)
 		}
 	}()
 
-	err = ad.writeRequestStats(path, ri.URL, stats)
+	err = ad.writeRequestStats(path, url, stats)
 	if err != nil {
 		return fmt.Errorf("Unable to write request stats - %s", err)
 	}
@@ -199,15 +214,27 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int]Dif
 
 	scPath := ad.getPath(ad.DirectoryPath, source.Name)
 
-	for i, tr := range target.Requests {
+	//TODO: we need to follow order of interactions
+
+	for i, interaction := range target.Interactions {
 		// record target into temporary location
-		err = ad.Record(tcDir, source.Name, tr, rules)
+		err = ad.Record(
+			tcDir,
+			source.Name,
+			interaction,
+			target.Request,
+			rules,
+		)
 		if err != nil {
 			return results, err
 		}
 
 		// wait for cassette until it is store in FS
-		targetCassettePath := path.Join(tcDir, source.Name, ad.getURLHash(tr.URL))
+		targetCassettePath := path.Join(
+			tcDir,
+			source.Name,
+			ad.getURLHash(interaction.URL),
+		)
 		if err = ad.waitForFile(fmt.Sprintf("%s.yaml", targetCassettePath), 0); err != nil {
 			return results, err
 		}
@@ -219,18 +246,25 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int]Dif
 		}
 
 		// load source cassette
-		si := source.Interactions[i]
-		sc, err := cassette.Load(path.Join(scPath, ad.getURLHash(si.URL)))
-		if err != nil {
-			return results, err
-		}
+		if len(source.Interactions) > i {
+			si := source.Interactions[i]
+			sc, err := cassette.Load(path.Join(scPath, ad.getURLHash(si.URL)))
+			if err != nil {
+				return results, err
+			}
 
-		// do comparison and collect errors
-		result, err := ad.compareInteractions(rules, *sc.Interactions[0], *tc.Interactions[0])
-		if err != nil {
-			return results, err
+			// do comparison and collect errors
+			result, err := ad.compareInteractions(
+				i,
+				rules,
+				*sc.Interactions[0],
+				*tc.Interactions[0],
+			)
+			if err != nil {
+				return results, err
+			}
+			results[i] = result
 		}
-		results[i] = result
 	}
 
 	// finally cleanup all temporary resources
@@ -293,23 +327,21 @@ func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) e
 	}
 
 	if ad.Options.Verbose {
-		fmt.Printf("Writing request metrics for %q into %q\"...\n", url, filepath)
+		fmt.Printf("Writing request metrics for %q into %q...\n", url, filepath)
 	}
 	return nil
 }
 
-func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) (Differences, error) {
+func (ad *APIDiff) compareInteractions(idx int, rules []MatchingRules, source cassette.Interaction, target cassette.Interaction) (Differences, error) {
 	result := Differences{
-		Headers: make(map[string]error),
-		Body:    make(map[string]error),
+		InteractionIndex: idx,
+		Headers:          make(map[string]error),
+		Body:             make(map[string]error),
 	}
 
 	// basic response comparison
 	sr := source.Response
 	tr := target.Response
-
-	// fmt.Printf("DEBUG: sr=%+v\n", sr)
-	// fmt.Printf("DEBUG: tr=%+v\n", tr)
 
 	// header ignore rules
 	ignoreHeaders := make(map[string]bool)
@@ -332,9 +364,11 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 		tv, found := tr.Headers[sk]
 		if !found {
 			result.Headers[sk] = errors.New("header is missing")
+			result.Changed = true
 		}
 		if !reflect.DeepEqual(sv, tv) {
 			result.Headers[sk] = fmt.Errorf("expect %v but got %v", sv, tv)
+			result.Changed = true
 		}
 	}
 
@@ -359,6 +393,7 @@ func (ad *APIDiff) compareInteractions(rules []MatchingRules, source cassette.In
 			return result, err
 		}
 		result.Body["payload"] = fmt.Errorf("%s", diffString)
+		result.Changed = true
 	}
 
 	return result, nil
@@ -383,6 +418,7 @@ func (ad *APIDiff) createRecorder(path string, rules []MatchingRules) (*recorder
 		return cassette.DefaultMatcher(r, cr)
 	})
 
+	//TODO: filteing does not seem to be working
 	// custom filter for stored request data
 	r.AddFilter(func(ci *cassette.Interaction) error {
 		if len(rules) > 0 {

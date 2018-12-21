@@ -7,7 +7,7 @@ matching_rules:
       - Date
       - Cf-Ray
 
-requests:
+interactions:
   - name: "Retrieve a single post by id that is contant (used for testing)."
     url: "https://jsonplaceholder.typicode.com/posts/1"
     method: "get"

@@ -9,6 +9,18 @@
 			"revisionTime": "2018-12-10T16:23:10Z"
 		},
 		{
+			"checksumSHA1": "71Gqx91r2F1D8WZU3TB/x7tFQUI=",
+			"path": "github.com/dnaeon/go-vcr/cassette",
+			"revision": "cd28cbc9b4cb410879adb3670e993cc545f2a167",
+			"revisionTime": "2018-12-10T16:23:10Z"
+		},
+		{
+			"checksumSHA1": "51IoHNG7FMqebbFdcFBDZvDkP6c=",
+			"path": "github.com/dnaeon/go-vcr/recorder",
+			"revision": "cd28cbc9b4cb410879adb3670e993cc545f2a167",
+			"revisionTime": "2018-12-10T16:23:10Z"
+		},
+		{
 			"checksumSHA1": "5LK/JjBog0PqfJb9GUvuAXfqvYU=",
 			"path": "github.com/mattn/go-runewidth",
 			"revision": "c88d7e5f2e24de48a200a2655ac8a0910be9a0f7",
