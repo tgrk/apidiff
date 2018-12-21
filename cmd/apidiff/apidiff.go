@@ -153,8 +153,14 @@ func main() {
 
 			start := time.Now()
 
-			for _, request := range manifest.Requests {
-				err = ad.Record(ad.DirectoryPath, session.Name, request, nil)
+			for _, interaction := range manifest.Interactions {
+				err = ad.Record(
+					ad.DirectoryPath,
+					session.Name,
+					interaction,
+					manifest.Request,
+					manifest.MatchingRules,
+				)
 				if err != nil {
 					printErrorf("Unable to record session due to %s", err)
 				}
@@ -191,7 +197,17 @@ func main() {
 				printErrorf("Unable to compare sessions due to %s", err)
 				os.Exit(1)
 			}
-			if len(errors) > 0 {
+
+			// display difference only when there are errors
+			hasErrors := false
+			for _, e := range errors {
+				if e.Changed {
+					hasErrors = true
+					break
+				}
+			}
+
+			if hasErrors {
 				ui.ShowComparisonResults(sourceSession, errors)
 			} else {
 				printInfoln("Success. No differences found")

@@ -1,0 +1,19 @@
+version: 1
+matching_rules:
+  - name: "match_url"
+    value: True
+  - name: "ignore_headers"
+    value:
+      - Authorization
+      - Date
+      - Set-Cookie
+      - Cf-Ray
+request:
+  headers:
+    Content-Type:
+      - application/json; charset=utf-8
+
+interactions:
+  - name: "Get random user data over API"
+    url: "https://randomuser.me/api/"
+    method: "get"

@@ -27,6 +27,15 @@ type RecordedInteraction struct {
 	Stats      RequestStats
 }
 
+// RequestInteraction represents request info for API interaction
+type RequestInteraction struct {
+	URL        string      `yaml:"url"`
+	Method     string      `yaml:"method"`
+	StatusCode int         `yaml:"status_code"`
+	Headers    http.Header `yaml:"headers"`
+	Payload    string      `yaml:"body"`
+}
+
 // RequestStats hold HTTP stats metrics
 type RequestStats struct {
 	DNSLookup        int `yaml:"dns_lookup"`
@@ -42,10 +51,8 @@ type MatchingRules struct {
 	Value interface{} `yaml:"value"`
 }
 
-// RequestInfo contains API request details
+// RequestInfo contains shared API request details
 type RequestInfo struct {
-	URL     string      `yaml:"url"`
-	Method  string      `yaml:"method"`
 	Payload string      `yaml:"body"`
 	Headers http.Header `yaml:"headers"`
 }
@@ -56,4 +63,5 @@ type Differences struct {
 	InteractionIndex int
 	Headers          map[string]error
 	Body             map[string]error
+	Changed          bool
 }
