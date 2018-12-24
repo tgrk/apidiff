@@ -219,11 +219,6 @@ func (ad *APIDiff) Record(dir, name string, interaction RequestInteraction, ri R
 		return err
 	}
 
-	if ad.Options.Verbose {
-		fmt.Printf("Request finished with status: %s\n", resp.Status)
-		fmt.Println("---")
-	}
-
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
 			panic(err)
@@ -255,8 +250,6 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int]Dif
 	}
 
 	scPath := ad.getPath(ad.DirectoryPath, source.Name)
-
-	//TODO: we need to follow order of interactions
 
 	for i, interaction := range target.Interactions {
 		// record target into temporary location
