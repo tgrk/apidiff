@@ -1,10 +1,13 @@
 package apidiff
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 
+	"github.com/dnaeon/go-vcr/cassette"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -41,18 +44,20 @@ func (ui *UI) ListSessions(sessions []RecordedSession, showCaption bool) {
 	fmt.Println()
 }
 
-// ShowSessionDetail displays detail of selected session
-func (ui *UI) ShowSessionDetail(session RecordedSession) {
+// ShowSession displays detail of selected session
+func (ui *UI) ShowSession(session RecordedSession) {
 	if len(session.Interactions) == 0 {
 		fmt.Println("| No recorded session interactions found")
 	} else {
 		rows := [][]string{}
-		for _, interaction := range session.Interactions {
+		for i, interaction := range session.Interactions {
 			rows = append(rows, []string{
+				strconv.Itoa(i + 1),
 				interaction.Method,
-				strconv.Itoa(interaction.StatusCode),
-				fmt.Sprintf("%d ms", interaction.Stats.ServerProcessing),
 				interaction.URL,
+				strconv.Itoa(interaction.StatusCode),
+				ui.formatMS(interaction.Stats.ServerProcessing),
+				ui.formatMS(interaction.Stats.Duration()),
 			})
 		}
 
@@ -60,13 +65,59 @@ func (ui *UI) ShowSessionDetail(session RecordedSession) {
 
 		table := tablewriter.NewWriter(os.Stdout)
 		table.SetCenterSeparator("|")
-		table.SetHeader([]string{"Method", "Status", "Duration", "URI"})
+		table.SetHeader([]string{
+			"#",
+			"Method",
+			"URI",
+			"Status",
+			"Duration",
+			"Processing",
+		})
 		table.SetCaption(true, fmt.Sprintf(" Total %d interaction(s)", len(session.Interactions)))
 		table.AppendBulk(rows)
 		table.Render()
 
 		fmt.Println()
 	}
+}
+
+// ShowInteractionDetail displays recorded session interaction by given index
+func (ui *UI) ShowInteractionDetail(interaction *cassette.Interaction, stats *RequestStats) {
+	fmt.Println()
+
+	req := interaction.Request
+	resp := interaction.Response
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetCenterSeparator("|")
+	table.SetAutoMergeCells(true)
+	table.SetRowLine(true)
+	table.SetHeader([]string{"Type", "Field", "Value"})
+
+	table.AppendBulk([][]string{
+		// request
+		[]string{"Request", "URL", req.URL},
+		[]string{"Request", "Method", req.Method},
+		[]string{"Request", "Headers", fmt.Sprintf("%+v", req.Headers)},
+		[]string{"Request", "Params", fmt.Sprintf("%+v", req.Form)},
+		[]string{"Request", "Payload", ui.formatJSON(req.Body)},
+
+		// response
+		[]string{"Response", "Headers", fmt.Sprintf("%+v", resp.Headers)},
+		[]string{"Response", "Status", resp.Status},
+		[]string{"Response", "Body", ui.formatJSON(resp.Body)},
+
+		// metrics
+		[]string{"Metrics", "DNS Lookup", ui.formatMS(stats.DNSLookup)},
+		[]string{"Metrics", "TCP Connection", ui.formatMS(stats.TCPConnection)},
+		[]string{"Metrics", "TLS Handshake", ui.formatMS(stats.TLSHandshake)},
+		[]string{"Metrics", "Server Processing", ui.formatMS(stats.ServerProcessing)},
+		[]string{"Metrics", "Content Transfer", ui.formatMS(stats.ContentTransfer)},
+		[]string{"Metrics", "Total duration", ui.formatMS(stats.Duration())},
+	})
+	table.Render()
+
+	fmt.Println()
 }
 
 // ShowComparisonResults displays result of comparing source and target
@@ -112,4 +163,15 @@ func (ui *UI) ShowComparisonResults(source RecordedSession, errors map[int]Diffe
 
 		fmt.Println()
 	}
+}
+
+func (ui *UI) formatMS(duration int) string {
+	return fmt.Sprintf("%d ms", duration)
+}
+
+//TODO: pretty printing does not seem to be working correctly
+func (ui *UI) formatJSON(body string) string {
+	var prettyJSON bytes.Buffer
+	json.Indent(&prettyJSON, []byte(body), "", "   ")
+	return string(prettyJSON.Bytes())
 }

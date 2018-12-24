@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -123,15 +122,53 @@ func (ad *APIDiff) Show(name string) (RecordedSession, error) {
 	return session, nil
 }
 
+// Detail returns interaction from recorded session given
+// its name and index
+func (ad *APIDiff) Detail(name string, interactionIndex int) (*cassette.Interaction, *RequestStats, error) {
+	sessionPath := path.Join(ad.DirectoryPath, name)
+	paths, err := ad.listInteractions(sessionPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var result *cassette.Interaction
+	var stats RequestStats
+	found := false
+	i := 0
+	for _, path := range paths {
+		if i == interactionIndex-1 {
+			// parse interactions
+			result, err = ad.loadCassette(path)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			// parse interaction stats
+			stats, err = ad.loadRequestStats(path)
+			if err != nil {
+				return nil, nil, err
+			}
+			found = true
+			break
+		}
+		i++
+	}
+
+	if !found {
+		return nil, nil, fmt.Errorf("unable to find interaction with index %d", interactionIndex)
+	}
+
+	return result, &stats, nil
+}
+
 // Record stores requested URL using casettes into a defined directory
 func (ad *APIDiff) Record(dir, name string, interaction RequestInteraction, ri RequestInfo, rules []MatchingRules) error {
 	url := interaction.URL
 	method := strings.ToUpper(interaction.Method)
-
-	path := path.Join(ad.getPath(dir, name), ad.getURLHash(url))
+	path := path.Join(ad.getPath(dir, name), interaction.Fingerprint())
 
 	if ad.Options.Verbose {
-		fmt.Printf("Recording %q to \"%s.yaml\"...\n", url, path)
+		fmt.Printf("Recording %s %q into \"%s.yaml\"...\n", method, url, path)
 	}
 
 	r, err := ad.createRecorder(path, rules)
@@ -193,9 +230,14 @@ func (ad *APIDiff) Record(dir, name string, interaction RequestInteraction, ri R
 		}
 	}()
 
-	err = ad.writeRequestStats(path, url, stats)
+	err = ad.writeRequestStats(path, stats)
 	if err != nil {
 		return fmt.Errorf("Unable to write request stats - %s", err)
+	}
+
+	if ad.Options.Verbose {
+		fmt.Printf("Request finished with status: %s\n", resp.Status)
+		fmt.Println("---")
 	}
 
 	return nil
@@ -233,7 +275,7 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int]Dif
 		targetCassettePath := path.Join(
 			tcDir,
 			source.Name,
-			ad.getURLHash(interaction.URL),
+			interaction.Fingerprint(),
 		)
 		if err = ad.waitForFile(fmt.Sprintf("%s.yaml", targetCassettePath), 0); err != nil {
 			return results, err
@@ -247,8 +289,9 @@ func (ad *APIDiff) Compare(source RecordedSession, target Manifest) (map[int]Dif
 
 		// load source cassette
 		if len(source.Interactions) > i {
-			si := source.Interactions[i]
-			sc, err := cassette.Load(path.Join(scPath, ad.getURLHash(si.URL)))
+			sc, err := cassette.Load(
+				path.Join(scPath, interaction.Fingerprint()),
+			)
 			if err != nil {
 				return results, err
 			}
@@ -289,7 +332,7 @@ func (ad *APIDiff) Delete(name string) error {
 	return os.RemoveAll(path)
 }
 
-func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) error {
+func (ad *APIDiff) writeRequestStats(path string, result httpstat.Result) error {
 	dirpath := filepath.Dir(path)
 	if _, err := os.Stat(dirpath); os.IsNotExist(err) {
 		if err := os.MkdirAll(dirpath, os.ModePerm); err != nil {
@@ -327,7 +370,7 @@ func (ad *APIDiff) writeRequestStats(path, url string, result httpstat.Result) e
 	}
 
 	if ad.Options.Verbose {
-		fmt.Printf("Writing request metrics for %q into %q...\n", url, filepath)
+		fmt.Printf("Writing request metrics into %q...\n", filepath)
 	}
 	return nil
 }
@@ -418,7 +461,6 @@ func (ad *APIDiff) createRecorder(path string, rules []MatchingRules) (*recorder
 		return cassette.DefaultMatcher(r, cr)
 	})
 
-	//TODO: filteing does not seem to be working
 	// custom filter for stored request data
 	r.AddFilter(func(ci *cassette.Interaction) error {
 		if len(rules) > 0 {
@@ -479,7 +521,7 @@ func (ad *APIDiff) loadInteraction(path string) (RecordedInteraction, error) {
 		URL:        c.Request.URL,
 		Method:     c.Request.Method,
 		StatusCode: c.Response.Code,
-		Stats:      *stats,
+		Stats:      stats,
 	}
 
 	return interaction, nil
@@ -493,17 +535,20 @@ func (ad *APIDiff) loadCassette(path string) (*cassette.Interaction, error) {
 	return c.Interactions[0], nil
 }
 
-func (ad *APIDiff) loadRequestStats(path string) (*RequestStats, error) {
+func (ad *APIDiff) loadRequestStats(path string) (RequestStats, error) {
+	stats := RequestStats{}
+
+	path = strings.Replace(path, ".yaml", "_stats.yaml", -1)
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return stats, err
 	}
 
-	stats := &RequestStats{}
-	err = yaml.Unmarshal(data, stats)
+	err = yaml.Unmarshal(data, &stats)
 	if err != nil {
-		return nil, err
+		return stats, err
 	}
+
 	return stats, nil
 }
 
@@ -520,13 +565,4 @@ func (ad *APIDiff) waitForFile(path string, retry int) error {
 
 func (ad *APIDiff) getPath(dir, name string) string {
 	return path.Join(dir, name)
-}
-
-func (ad *APIDiff) getURLHash(url string) string {
-	h := fnv.New32a()
-	_, err := h.Write([]byte(url))
-	if err != nil {
-		panic(err)
-	}
-	return fmt.Sprint(h.Sum32())
 }

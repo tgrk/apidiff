@@ -62,6 +62,11 @@ appidiff -list
 appidiff -show "foo"
 ```
 
+### Detail of first session interaction
+```bash
+appidiff -detail "foo" 1
+```
+
 ### Delete an existing session
 ```bash
 appidiff -del "foo"
