@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/tgrk/apidiff"
@@ -25,7 +26,8 @@ var (
 	compareCmd = flag.Bool("compare", false, "compare recorded session against a URL")
 	listCmd    = flag.Bool("list", false, "list all recorded API sessions")
 	deleteCmd  = flag.Bool("del", false, "list all recorded API sessions")
-	showCmd    = flag.Bool("show", false, "list all recorded API sessions")
+	showCmd    = flag.Bool("show", false, "show recorded API session")
+	detailCmd  = flag.Bool("detail", false, "view detail fo recorded API session")
 
 	// command specific
 	name      = flag.String("name", "", "name of session to be recorded")
@@ -95,7 +97,37 @@ func main() {
 			os.Exit(1)
 		}
 
-		ui.ShowSessionDetail(session)
+		ui.ShowSession(session)
+	}
+
+	if *detailCmd {
+		sessionName := *name
+		var interactionIndex = 0
+		if flag.NArg() > 0 {
+			sessionName = flag.Arg(0)
+			interactionIndex, err = strconv.Atoi(flag.Arg(1))
+			if err != nil {
+				printErrorf("Unable to parse interaction index due to %s", err)
+				os.Exit(1)
+			}
+		}
+
+		if sessionName == "" {
+			printErrorln("Missing session name (-name \"foo\")")
+			os.Exit(1)
+		}
+		if interactionIndex == 0 {
+			printErrorln("Missing interaction index")
+			os.Exit(1)
+		}
+
+		interaction, stats, err := ad.Detail(sessionName, interactionIndex)
+		if err != nil {
+			printErrorf("Unable to view recorded session due to %s", err)
+			os.Exit(1)
+		}
+
+		ui.ShowInteractionDetail(interaction, stats)
 	}
 
 	if *deleteCmd {
