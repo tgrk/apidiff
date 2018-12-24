@@ -24,6 +24,8 @@ Usage: apidiff [OPTIONS] argument ...
     	compare recorded sessions against a URL
   -del
     	list all recorded API sessions
+  -detail
+    	view detail fo recorded API session
   -dir string
     	path where API calls are stored (default $HOME/.apidiff/)
   -list
