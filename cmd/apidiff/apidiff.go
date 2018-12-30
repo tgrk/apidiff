@@ -58,7 +58,7 @@ func main() {
 		}
 	}
 
-	ui := apidiff.NewUI()
+	ui := apidiff.NewUI(os.Stdout)
 
 	options := apidiff.Options{
 		Verbose: *verbose,

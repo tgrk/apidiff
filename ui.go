@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 	"strconv"
 
 	"github.com/dnaeon/go-vcr/cassette"
@@ -13,11 +13,14 @@ import (
 
 // UI contains helpers for drawing CLI interface
 type UI struct {
+	out io.Writer
 }
 
 // NewUI returns instance
-func NewUI() *UI {
-	return &UI{}
+func NewUI(w io.Writer) *UI {
+	return &UI{
+		out: w,
+	}
 }
 
 // ListSessions draws table of existing recorded sessions
@@ -32,22 +35,22 @@ func (ui *UI) ListSessions(sessions []RecordedSession, showCaption bool) {
 		})
 	}
 
-	fmt.Println()
+	fmt.Fprintln(ui.out)
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(ui.out)
 	table.SetCenterSeparator("|")
 	table.SetHeader([]string{"Name", "Path", "# Interactions", "Created"})
 	table.AppendBulk(rows)
 	table.SetCaption(showCaption, fmt.Sprintf(" Total %d session(s)", len(rows)))
 	table.Render()
 
-	fmt.Println()
+	fmt.Fprintln(ui.out)
 }
 
 // ShowSession displays detail of selected session
 func (ui *UI) ShowSession(session RecordedSession) {
 	if len(session.Interactions) == 0 {
-		fmt.Println("| No recorded session interactions found")
+		fmt.Fprintf(ui.out, "No recorded session interactions found")
 	} else {
 		rows := [][]string{}
 		for i, interaction := range session.Interactions {
@@ -61,9 +64,9 @@ func (ui *UI) ShowSession(session RecordedSession) {
 			})
 		}
 
-		fmt.Println()
+		fmt.Fprintln(ui.out)
 
-		table := tablewriter.NewWriter(os.Stdout)
+		table := tablewriter.NewWriter(ui.out)
 		table.SetCenterSeparator("|")
 		table.SetHeader([]string{
 			"#",
@@ -77,18 +80,18 @@ func (ui *UI) ShowSession(session RecordedSession) {
 		table.AppendBulk(rows)
 		table.Render()
 
-		fmt.Println()
+		fmt.Fprintln(ui.out)
 	}
 }
 
 // ShowInteractionDetail displays recorded session interaction by given index
 func (ui *UI) ShowInteractionDetail(interaction *cassette.Interaction, stats *RequestStats) {
-	fmt.Println()
+	fmt.Fprintln(ui.out)
 
 	req := interaction.Request
 	resp := interaction.Response
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(ui.out)
 	table.SetCenterSeparator("|")
 	table.SetAutoMergeCells(true)
 	table.SetRowLine(true)
@@ -117,14 +120,14 @@ func (ui *UI) ShowInteractionDetail(interaction *cassette.Interaction, stats *Re
 	})
 	table.Render()
 
-	fmt.Println()
+	fmt.Fprintln(ui.out)
 }
 
 // ShowComparisonResults displays result of comparing source and target
 // sessions
 func (ui *UI) ShowComparisonResults(source RecordedSession, errors map[int]Differences) {
 	if len(source.Interactions) == 0 {
-		fmt.Println("| No recorded session interactions found")
+		fmt.Fprintf(ui.out, "No recorded session interactions found")
 	} else {
 		total := 0
 		rows := [][]string{}
@@ -150,9 +153,9 @@ func (ui *UI) ShowComparisonResults(source RecordedSession, errors map[int]Diffe
 			}
 		}
 
-		fmt.Println()
+		fmt.Fprintln(ui.out)
 
-		table := tablewriter.NewWriter(os.Stdout)
+		table := tablewriter.NewWriter(ui.out)
 		table.SetRowLine(true)
 		table.SetAutoWrapText(false)
 		table.SetCenterSeparator("|")
@@ -161,7 +164,7 @@ func (ui *UI) ShowComparisonResults(source RecordedSession, errors map[int]Diffe
 		table.AppendBulk(rows)
 		table.Render()
 
-		fmt.Println()
+		fmt.Fprintln(ui.out)
 	}
 }
 

@@ -1,6 +1,7 @@
 package apidiff
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path"
@@ -77,6 +78,22 @@ func TestSessionManagement(t *testing.T) {
 			expectedRequest.Method,
 			interaction.Method,
 		)
+	}
+
+	// detail of session interaction
+	c, s, err := ad.Detail(sessionName, 1)
+	if err != nil {
+		panic(err)
+	}
+
+	cassetteType := reflect.TypeOf(c).String()
+	if cassetteType != "*cassette.Interaction" {
+		t.Errorf("Expected to get cassette interaction but got %q", cassetteType)
+	}
+
+	statsType := reflect.TypeOf(s).String()
+	if statsType != "*apidiff.RequestStats" {
+		t.Errorf("Expected to get request stats but got %q", statsType)
 	}
 
 	// delete existing session
@@ -224,6 +241,30 @@ func TestIsValidURL(t *testing.T) {
 		if expected[i] != ad.isValidURL(url) {
 			t.Errorf("Expected %q to be invalid", url)
 		}
+	}
+}
+
+func TestUI(t *testing.T) {
+	var buf bytes.Buffer
+
+	ui := NewUI(&buf)
+
+	// list view
+	ui.ListSessions([]RecordedSession{}, false)
+	got := buf.String()
+
+	if len(got) == 0 {
+		t.Errorf("Expected to got rendered table but got %q", got)
+	}
+
+	buf.Reset()
+
+	// show view
+	ui.ShowSession(RecordedSession{})
+
+	got = buf.String()
+	if strings.Index(got, "No recorded session interactions found") == -1 {
+		t.Errorf("Expected to render no interaction found but got %q", got)
 	}
 }
 
