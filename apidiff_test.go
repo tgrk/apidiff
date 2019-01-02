@@ -244,7 +244,7 @@ func TestIsValidURL(t *testing.T) {
 	}
 }
 
-func TestUI(t *testing.T) {
+func TestEmptyUI(t *testing.T) {
 	var buf bytes.Buffer
 
 	ui := NewUI(&buf)
@@ -259,12 +259,78 @@ func TestUI(t *testing.T) {
 
 	buf.Reset()
 
+	// show empty view
+	ui.ShowSession(RecordedSession{})
+
+	got = buf.String()
+	if strings.Index(got, "No recorded session interactions found") == -1 {
+		t.Errorf("Expected to render no interaction found but got %q", got)
+	}
+
+	buf.Reset()
+
 	// show view
 	ui.ShowSession(RecordedSession{})
 
 	got = buf.String()
 	if strings.Index(got, "No recorded session interactions found") == -1 {
 		t.Errorf("Expected to render no interaction found but got %q", got)
+	}
+}
+
+func TestNonEmptyUI(t *testing.T) {
+	path, err := makeTempStorageDirectory()
+	if err != nil {
+		panic(err)
+	}
+	defer removeTempStorageDirectory(path)
+
+	// record session based on example
+	ad := New(path, Options{Verbose: true})
+	manifest := readExampleManifest("constant.yaml", t)
+	for _, interaction := range manifest.Interactions {
+		err = ad.Record(
+			path,
+			sessionName,
+			interaction,
+			manifest.Request,
+			manifest.MatchingRules,
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+	sessions, err := ad.List()
+	if err != nil {
+		panic(err)
+	}
+
+	var buf bytes.Buffer
+	ui := NewUI(&buf)
+
+	// list view
+	ui.ListSessions(sessions, false)
+	got := buf.Len()
+
+	if got == 0 {
+		t.Errorf("Expected to got rendered table but got %q", got)
+	}
+
+	buf.Reset()
+
+	// show empty view
+	ui.ShowSession(sessions[0])
+
+	if buf.Len() != 501 {
+		t.Errorf("Expected to got rendered list table but got:\n %s", buf.String())
+	}
+
+	buf.Reset()
+
+	// show view
+	ui.ShowSession(sessions[0])
+	if buf.Len() != 501 {
+		t.Errorf("Expected to got rendered show table but got:\n %s", buf.String())
 	}
 }
 
