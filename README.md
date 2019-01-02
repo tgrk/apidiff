@@ -10,7 +10,7 @@ Records HTTP API (JSON based) calls and compares the them on both HTTP and JSON 
 ## Installation
 
 ```bash
-$ go get github.com/tgrk/apidiff
+$ go get gopkg.in/tgrk/apidiff.v1
 
 ```
 
