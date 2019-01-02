@@ -16,6 +16,8 @@ $ go get github.com/tgrk/apidiff
 
 ## Usage
 
+[![asciicast](https://asciinema.org/a/219377.svg)](https://asciinema.org/a/219377)
+
 ```bash
 $ apidiff -h
 Usage: apidiff [OPTIONS] argument ...
