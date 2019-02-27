@@ -9,6 +9,13 @@ Records HTTP API (JSON based) calls and compares the them on both HTTP and JSON 
 
 ## Installation
 
+As binary:
+```bash
+$ go get github.com/tgrk/apidiff
+$ go install github.com/tgrk/apidiff/cmd/apidiff
+```
+
+As dependency:
 ```bash
 $ go get gopkg.in/tgrk/apidiff.v1
 
